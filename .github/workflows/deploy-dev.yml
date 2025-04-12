@@ -51,10 +51,15 @@ jobs:
       - name: Rodar aplicação com perfil de desenvolvimento e porta 8081
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
+          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+          '/home/ubuntu/develop/start-dev.sh'
+
+      - name: Ver log parcial (debug)
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            'cd /home/ubuntu/develop && \
-             nohup java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar \
-             --spring.profiles.active=dev > log-develop.txt 2>&1 &'
+            'tail -n 30 /home/ubuntu/develop/log-develop.txt || echo "log não encontrado"'
+
       - name: Esperar app subir (20s)
         run: sleep 20
 
