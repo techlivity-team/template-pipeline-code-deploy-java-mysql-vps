@@ -1,9 +1,8 @@
 name: Deploy Dev to VPS
 
 on:
-  push:
-    branches:
-      - develop  # ou o branch que você quiser usar para deploy de desenvolvimento
+  pull_request:
+    branches: [ "develop" ]
 
 jobs:
   deploy:
@@ -14,13 +13,19 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Instalar JDK
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
-          java-version: '17' # ajuste conforme sua versão
+          java-version: '17'
           distribution: 'temurin'
-
+          cache: maven
       - name: Build com Maven
+        working-directory: app
         run: mvn clean package -DskipTests
+
+      - name: Debug vars (sem mostrar senha)
+        run: |
+          echo "User: ${{ secrets.VPS_USER }}"
+          echo "Host: ${{ secrets.VPS_HOST }}"
 
       - name: Instalar sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
@@ -28,15 +33,44 @@ jobs:
       - name: Copiar JAR para VPS
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" scp -o StrictHostKeyChecking=no \
-            target/api-teste-mysql-0.0.1-SNAPSHOT.jar \
+            app/target/api-teste-mysql-0.0.1-SNAPSHOT.jar \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/develop
 
-      - name: Rodar aplicação com perfil local e porta 8081
+      - name: Encerrar processo anterior na porta 8081
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            'cd /home/ubuntu/develop && \
-             nohup java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar \
-             --spring.profiles.active=local \
-             --server.port=8081 > log-develop.txt 2>&1 &'
+            'PID=$(lsof -ti:8081); \
+             if [ -n "$PID" ]; then \
+               echo "🔴 Encerrando processo na porta 8081 (PID=$PID)"; \
+               kill -9 $PID; \
+             else \
+               echo "✅ Nenhum processo na porta 8081"; \
+             fi'
 
+      - name: Rodar aplicação via tmux
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'tmux kill-session -t app-dev 2>/dev/null || true && \
+             cd /home/ubuntu/develop && \
+             tmux new-session -d -s app-dev "java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev --server.port=8081" && \
+             echo "✅ Aplicação iniciada via tmux."'
+
+
+      - name: Aguardar subida da aplicação
+        run: sleep 20
+
+      - name: Health Check da aplicação
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.VPS_HOST }}:8081/actuator/health)
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "❌ Aplicação não respondeu com status 200. Status recebido: $HTTP_STATUS"
+            echo "📝 Últimas linhas do log:"
+            sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
+              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+              'tail -n 100 /home/ubuntu/develop/log-develop.txt'
+            exit 1
+          else
+            echo "✅ Aplicação respondeu com sucesso (status 200)"
+          fi
