@@ -22,6 +22,11 @@ jobs:
         working-directory: app
         run: mvn clean package -DskipTests
 
+      - name: Debug vars (sem mostrar senha)
+        run: |
+          echo "User: ${{ secrets.VPS_USER }}"
+          echo "Host: ${{ secrets.VPS_HOST }}"
+
       - name: Instalar sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
