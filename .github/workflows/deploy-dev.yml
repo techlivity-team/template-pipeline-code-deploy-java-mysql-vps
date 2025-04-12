@@ -1,0 +1,42 @@
+name: Deploy Dev to VPS
+
+on:
+  push:
+    branches:
+      - develop  # ou o branch que você quiser usar para deploy de desenvolvimento
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Instalar JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17' # ajuste conforme sua versão
+          distribution: 'temurin'
+
+      - name: Build com Maven
+        run: mvn clean package -DskipTests
+
+      - name: Instalar sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Copiar JAR para VPS
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp -o StrictHostKeyChecking=no \
+            target/api-teste-mysql-0.0.1-SNAPSHOT.jar \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/develop
+
+      - name: Rodar aplicação com perfil local e porta 8081
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'cd /home/ubuntu/develop && \
+             nohup java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar \
+             --spring.profiles.active=local \
+             --server.port=8081 > log-develop.txt 2>&1 &'
+
