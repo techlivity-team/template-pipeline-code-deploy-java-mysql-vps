@@ -53,7 +53,7 @@ jobs:
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
           cd /home/ubuntu/develop/ && \
-          chmod -x start-dev.sh && \
+          chmod +x start-dev.sh && \
           './start-dev.sh'
 
       - name: Ver log parcial (debug)
