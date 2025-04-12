@@ -48,15 +48,16 @@ jobs:
                echo "✅ Nenhum processo na porta 8081"; \
              fi'
 
-      - name: Rodar aplicação com perfil de desenvolvimento e porta 8081
+      - name: Rodar aplicação com perfil de desenvolvimento
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-          'cd /home/ubuntu/develop && \
+          'fuser -k 8081/tcp || true && \
+           cd /home/ubuntu/develop && \
            echo "🔧 Iniciando app em ambiente de desenvolvimento..." && \
-           nohup java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar \
+           setsid java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar \
            --spring.profiles.active=dev \
-           --server.port=8081 > log-develop.txt 2>&1 < /dev/null & disown && \
+           --server.port=8081 > log-develop.txt 2>&1 < /dev/null & \
            echo "✅ Aplicação iniciada com sucesso."'
 
 
