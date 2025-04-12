@@ -1,9 +1,8 @@
 name: Deploy Dev to VPS
 
 on:
-  push:
-    branches:
-      - develop  # ou o branch que você quiser usar para deploy de desenvolvimento
+  pull_request:
+    branches: [ "develop" ]
 
 jobs:
   deploy:
