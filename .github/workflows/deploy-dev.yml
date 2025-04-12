@@ -36,6 +36,18 @@ jobs:
             app/target/api-teste-mysql-0.0.1-SNAPSHOT.jar \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/develop
 
+      - name: Encerrar processo anterior na porta 8081
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'PID=$(lsof -ti:8081); \
+             if [ -n "$PID" ]; then \
+               echo "🔴 Encerrando processo na porta 8081 (PID=$PID)"; \
+               kill -9 $PID; \
+             else \
+               echo "✅ Nenhum processo na porta 8081"; \
+             fi'
+
       - name: Rodar aplicação com perfil de desenvolvimento e porta 8081
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
