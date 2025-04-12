@@ -54,6 +54,7 @@ jobs:
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
           cd /home/ubuntu/develop/ && \
           chmod +x start-dev.sh && \
+          ls -la \
           './start-dev.sh'
 
       - name: Ver log parcial (debug)
