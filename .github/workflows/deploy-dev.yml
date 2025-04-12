@@ -48,17 +48,15 @@ jobs:
                echo "✅ Nenhum processo na porta 8081"; \
              fi'
 
-      - name: Rodar aplicação com perfil de desenvolvimento e porta 8081
+      - name: Rodar aplicação via tmux
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
-          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-          'fuser -k 8081/tcp || true && \
-           cd /home/ubuntu/develop && \
-           echo "🔧 Iniciando app em ambiente de desenvolvimento..." && \
-           java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar \
-           --spring.profiles.active=dev \
-           --server.port=8081 > log-develop.txt 2>&1 < /dev/null & disown && \
-           echo "✅ Aplicação iniciada com sucesso."'
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'tmux kill-session -t app-dev 2>/dev/null || true && \
+             cd /home/ubuntu/develop && \
+             tmux new-session -d -s app-dev "java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev --server.port=8081" && \
+             echo "✅ Aplicação iniciada via tmux."'
+
 
       - name: Aguardar subida da aplicação
         run: sleep 20
