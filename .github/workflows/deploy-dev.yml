@@ -63,7 +63,7 @@ jobs:
 
       - name: Health Check da aplicação
         run: |
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.VPS_HOST }}:8081/users)
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.VPS_HOST }}:8081/actuator/health)
           if [ "$HTTP_STATUS" -ne 200 ]; then
             echo "❌ Aplicação não respondeu com status 200. Status recebido: $HTTP_STATUS"
             echo "📝 Últimas linhas do log:"
