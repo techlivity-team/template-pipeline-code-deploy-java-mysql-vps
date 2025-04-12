@@ -44,4 +44,15 @@ jobs:
              nohup java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar \
              --spring.profiles.active=local \
              --server.port=8081 > log-develop.txt 2>&1 &'
+      - name: Esperar app subir (20s)
+        run: sleep 20
 
+      - name: Health Check da aplicação
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.VPS_HOST }}:8081/users)
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "❌ Aplicação não respondeu com status 200. Status recebido: $HTTP_STATUS"
+            exit 1
+          else
+            echo "✅ Aplicação respondeu com sucesso (status 200)"
+          fi
