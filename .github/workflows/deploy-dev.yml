@@ -48,26 +48,19 @@ jobs:
                echo "✅ Nenhum processo na porta 8081"; \
              fi'
 
-      - name: Rodar aplicação com perfil de desenvolvimento
+      - name: Rodar aplicação com perfil de desenvolvimento e porta 8081
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
           'fuser -k 8081/tcp || true && \
            cd /home/ubuntu/develop && \
            echo "🔧 Iniciando app em ambiente de desenvolvimento..." && \
-           setsid java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar \
+           java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar \
            --spring.profiles.active=dev \
-           --server.port=8081 > log-develop.txt 2>&1 < /dev/null & \
+           --server.port=8081 > log-develop.txt 2>&1 < /dev/null & disown && \
            echo "✅ Aplicação iniciada com sucesso."'
 
-
-      - name: Ver log parcial (debug)
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            'tail -n 30 /home/ubuntu/develop/log-develop.txt || echo "log não encontrado"'
-
-      - name: Esperar app subir (20s)
+      - name: Aguardar subida da aplicação
         run: sleep 20
 
       - name: Health Check da aplicação
@@ -75,6 +68,10 @@ jobs:
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.VPS_HOST }}:8081/users)
           if [ "$HTTP_STATUS" -ne 200 ]; then
             echo "❌ Aplicação não respondeu com status 200. Status recebido: $HTTP_STATUS"
+            echo "📝 Últimas linhas do log:"
+            sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
+              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+              'tail -n 100 /home/ubuntu/develop/log-develop.txt'
             exit 1
           else
             echo "✅ Aplicação respondeu com sucesso (status 200)"
