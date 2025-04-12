@@ -52,10 +52,13 @@ jobs:
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-          cd /home/ubuntu/develop/ && \
-          chmod +x start-dev.sh && \
-          ls -la \
-          './start-dev.sh'
+          'cd /home/ubuntu/develop && \
+           echo "🔧 Iniciando app em ambiente de desenvolvimento..." && \
+           nohup java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar \
+           --spring.profiles.active=dev \
+           --server.port=8081 > log-develop.txt 2>&1 & \
+           echo "✅ Aplicação iniciada em background."'
+
 
       - name: Ver log parcial (debug)
         run: |
