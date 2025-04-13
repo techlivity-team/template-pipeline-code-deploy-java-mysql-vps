@@ -45,9 +45,9 @@ jobs:
         with:
           name: app-jar
 
-      - name: Verificar conteúdo do diretório de artefato
+      - name: Verificar conteúdo do diretório atual
         run: |
-          ls -lh app-jar/
+          ls -lh
 
       - name: Instalar sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
@@ -56,9 +56,8 @@ jobs:
         run: |
           # Copiar o artefato do diretório correto
           scp -o StrictHostKeyChecking=no \
-            app-jar/api-teste-mysql-0.0.1-SNAPSHOT.jar \
+            api-teste-mysql-0.0.1-SNAPSHOT.jar \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/production
-
 
   shutdown:
     name: 🛑 Parar instância antiga
