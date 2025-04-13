@@ -54,7 +54,7 @@ jobs:
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             'tmux kill-session -t app-dev 2>/dev/null || true && \
              cd /home/ubuntu/develop && \
-             tmux new-session -d -s app-dev "java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev --server.port=8081" && \
+             tmux new-session -d -s app-dev "java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev && \
              echo "✅ Aplicação iniciada via tmux."'
 
 
@@ -71,10 +71,4 @@ jobs:
           else
             echo "✅ Aplicação respondeu com sucesso (status 200)"
           fi
-      - name: Ler logs da aplicação após health check
-        run: |
-          echo "📜 Exibindo as últimas 100 linhas do log da aplicação:"
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
-          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-          'tail -n 100 /home/ubuntu/develop/log-develop.txt'
 
