@@ -54,9 +54,15 @@ jobs:
 
       - name: Copiar JAR para VPS
         run: |
-          scp -o StrictHostKeyChecking=no \
-            api-teste-mysql-0.0.1-SNAPSHOT.jar \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/production
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" \
+          ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=no \
+          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p /home/ubuntu/production"
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" \
+          scp -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=no \
+          api-teste-mysql-0.0.1-SNAPSHOT.jar \
+          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/production/
+
 
   shutdown:
     name: 🛑 Parar instância antiga
