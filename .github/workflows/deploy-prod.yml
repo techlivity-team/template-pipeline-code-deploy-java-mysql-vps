@@ -54,7 +54,6 @@ jobs:
 
       - name: Copiar JAR para VPS
         run: |
-          # Copiar o artefato do diretório correto
           scp -o StrictHostKeyChecking=no \
             api-teste-mysql-0.0.1-SNAPSHOT.jar \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/production
