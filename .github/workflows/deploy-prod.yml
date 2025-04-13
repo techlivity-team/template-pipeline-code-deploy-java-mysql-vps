@@ -69,7 +69,7 @@ jobs:
 
       - name: Ler logs da aplicação
         run: |
-          echo "📜 Últimas 100 linhas do log:"
+          echo "📜 Últimas 200 linhas do log:"
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-          'tail -n 100 /home/ubuntu/production/log-develop.txt'
+          'tail -n 200 /home/ubuntu/production/logs/app.log'
