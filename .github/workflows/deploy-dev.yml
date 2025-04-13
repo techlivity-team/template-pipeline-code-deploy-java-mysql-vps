@@ -66,10 +66,7 @@ jobs:
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.VPS_HOST }}:8081/actuator/health)
           if [ "$HTTP_STATUS" -ne 200 ]; then
             echo "❌ Aplicação não respondeu com status 200. Status recebido: $HTTP_STATUS"
-            echo "📝 Últimas linhas do log:"
-            sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
-              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-              'tail -n 100 /home/ubuntu/develop/log-develop.txt'
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             exit 1
           else
             echo "✅ Aplicação respondeu com sucesso (status 200)"
