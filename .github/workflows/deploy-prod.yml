@@ -1,0 +1,75 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Instalar JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build com Maven
+        working-directory: app
+        run: mvn clean package -DskipTests
+
+      - name: Instalar sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Copiar JAR para VPS
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp -o StrictHostKeyChecking=no \
+            app/target/api-teste-mysql-0.0.1-SNAPSHOT.jar \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/production
+
+      - name: Encerrar processo anterior (porta 8080 - produção)
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'PID=$(lsof -ti:8080); \
+             if [ -n "$PID" ]; then \
+               echo "🔴 Encerrando processo na porta 8080 (PID=$PID)"; \
+               kill -9 $PID; \
+             else \
+               echo "✅ Nenhum processo na porta 8080"; \
+             fi'
+
+      - name: Rodar aplicação via tmux
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'tmux kill-session -t app-prod 2>/dev/null || true && \
+             cd /home/ubuntu/production && \
+             tmux new-session -d -s app-prod "java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod --server.port=8080" && \
+             echo "✅ Aplicação iniciada via tmux."'
+
+      - name: Aguardar subida da aplicação
+        run: sleep 20
+
+      - name: Health Check da aplicação
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.VPS_HOST }}:8080/actuator/health)
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "❌ Aplicação não respondeu com status 200. Status recebido: $HTTP_STATUS"
+            exit 1
+          else
+            echo "✅ Aplicação respondeu com sucesso (status 200)"
+          fi
+
+      - name: Ler logs da aplicação
+        run: |
+          echo "📜 Últimas 100 linhas do log:"
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
+          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+          'tail -n 100 /home/ubuntu/production/log-develop.txt'
