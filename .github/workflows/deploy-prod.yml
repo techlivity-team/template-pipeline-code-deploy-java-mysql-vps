@@ -25,6 +25,9 @@ jobs:
         working-directory: app
         run: mvn clean package -DskipTests
 
+      - name: Verificar se o JAR foi gerado
+        run: ls -lh app/target/
+
       - name: Salvar artefato
         uses: actions/upload-artifact@v3
         with:
