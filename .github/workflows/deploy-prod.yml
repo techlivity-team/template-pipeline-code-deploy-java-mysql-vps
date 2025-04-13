@@ -1,4 +1,4 @@
-name: Deploy to Production
+name: Deploy to Production VPS
 
 on:
   push:
@@ -6,7 +6,8 @@ on:
       - main
 
 jobs:
-  deploy:
+  build:
+    name: 🧱 Build app
     runs-on: ubuntu-latest
 
     steps:
@@ -24,52 +25,89 @@ jobs:
         working-directory: app
         run: mvn clean package -DskipTests
 
+      - name: Salvar artefato
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-jar
+          path: app/target/api-teste-mysql-0.0.1-SNAPSHOT.jar
+
+  upload:
+    name: 🚀 Enviar JAR para VPS
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Baixar artefato
+        uses: actions/download-artifact@v3
+        with:
+          name: app-jar
+
       - name: Instalar sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
       - name: Copiar JAR para VPS
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" scp -o StrictHostKeyChecking=no \
-            app/target/api-teste-mysql-0.0.1-SNAPSHOT.jar \
+            api-teste-mysql-0.0.1-SNAPSHOT.jar \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/production
 
-      - name: Encerrar processo anterior (porta 8080 - produção)
+  shutdown:
+    name: 🛑 Parar instância antiga
+    runs-on: ubuntu-latest
+    needs: upload
+
+    steps:
+      - name: Finalizar processo antigo
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             'PID=$(lsof -ti:8080); \
-             if [ -n "$PID" ]; then \
-               echo "🔴 Encerrando processo na porta 8080 (PID=$PID)"; \
-               kill -9 $PID; \
-             else \
-               echo "✅ Nenhum processo na porta 8080"; \
-             fi'
+             if [ -n "$PID" ]; then kill -9 $PID; fi'
 
-      - name: Rodar aplicação via tmux
+  deploy:
+    name: 🚦 Iniciar aplicação via tmux
+    runs-on: ubuntu-latest
+    needs: shutdown
+
+    steps:
+      - name: Iniciar via tmux
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             'tmux kill-session -t app-prod 2>/dev/null || true && \
              cd /home/ubuntu/production && \
-             tmux new-session -d -s app-prod "java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod --server.port=8080" && \
-             echo "✅ Aplicação iniciada via tmux."'
+             tmux new-session -d -s app-prod "export DATASOURCE_URL=${{ secrets.DATASOURCE_URL }} && \
+                                              export DATASOURCE_USERNAME=${{ secrets.DATASOURCE_USERNAME }} && \
+                                              export DATASOURCE_PASSWORD=${{ secrets.DATASOURCE_PASSWORD }} && \
+                                              java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod"'
 
-      - name: Aguardar subida da aplicação
+  health-check:
+    name: 🩺 Verificar aplicação
+    runs-on: ubuntu-latest
+    needs: deploy
+
+    steps:
+      - name: Esperar aplicação subir
         run: sleep 15
 
-      - name: Health Check da aplicação
+      - name: Verificar status
         run: |
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.VPS_HOST }}:8080/actuator/health)
           if [ "$HTTP_STATUS" -ne 200 ]; then
-            echo "❌ Aplicação não respondeu com status 200. Status recebido: $HTTP_STATUS"
+            echo "❌ Falha no Health Check. Status: $HTTP_STATUS"
             exit 1
           else
-            echo "✅ Aplicação respondeu com sucesso (status 200)"
+            echo "✅ Aplicação está no ar (200 OK)"
           fi
 
+  logs:
+    name: 📜 Logs
+    runs-on: ubuntu-latest
+    needs: health-check
+
+    steps:
       - name: Ler logs da aplicação
         run: |
-          echo "📜 Últimas 200 linhas do log:"
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
           'tail -n 200 /home/ubuntu/production/logs/app.log'
