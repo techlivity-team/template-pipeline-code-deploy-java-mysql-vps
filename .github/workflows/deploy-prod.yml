@@ -50,8 +50,9 @@ jobs:
 
       - name: Copiar JAR para VPS
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp -o StrictHostKeyChecking=no \
-            app-jar/api-teste-mysql-0.0.1-SNAPSHOT.jar \
+          # O caminho correto do artefato baixado
+          scp -o StrictHostKeyChecking=no \
+            ./app-jar/api-teste-mysql-0.0.1-SNAPSHOT.jar \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/production
 
   shutdown:
