@@ -55,7 +55,7 @@ jobs:
              echo "✅ Aplicação iniciada via tmux."'
 
       - name: Aguardar subida da aplicação
-        run: sleep 20
+        run: sleep 15
 
       - name: Health Check da aplicação
         run: |
