@@ -74,3 +74,10 @@ jobs:
           else
             echo "✅ Aplicação respondeu com sucesso (status 200)"
           fi
+      - name: Ler logs da aplicação após health check
+        run: |
+          echo "📜 Exibindo as últimas 100 linhas do log da aplicação:"
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
+          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+          'tail -n 100 /home/ubuntu/develop/log-develop.txt'
+

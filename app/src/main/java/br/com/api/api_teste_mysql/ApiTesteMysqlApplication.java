@@ -8,6 +8,7 @@ public class ApiTesteMysqlApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(ApiTesteMysqlApplication.class, args);
+		System.out.println("API Teste MySQL - Rodando na porta 8080");
 	}
 
 }
