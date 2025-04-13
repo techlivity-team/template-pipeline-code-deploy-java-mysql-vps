@@ -24,4 +24,9 @@ public class UserController {
     public List<User> getUsers() {
         return userRepository.findAll();
     }
+
+    @GetMapping("/test")
+    public String test() {
+        return "ok 2";
+    }
 }
