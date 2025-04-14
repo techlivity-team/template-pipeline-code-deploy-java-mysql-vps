@@ -112,31 +112,38 @@ jobs:
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
-            echo "#!/bin/bash
+          echo "#!/bin/bash
             set -e
-
-            echo \"➡️ Iniciando rollback para versão anterior...\"
+            
+            echo "➡️ Iniciando rollback para versão anterior..."
             cd /home/ubuntu/production || exit 1
-
-            echo \"🛑 Encerrando sessão tmux anterior (se existir)...\"
+            
+            echo "🛑 Encerrando sessão tmux anterior (se existir)..."
             tmux kill-session -t app-prod 2>/dev/null || true
-
-            echo \"🚀 Iniciando nova sessão tmux...\"
-            tmux new-session -d -s app-prod \"
-              export DATASOURCE_URL='${{ secrets.DATASOURCE_URL }}';
-              export DATASOURCE_USERNAME='${{ secrets.DATASOURCE_USERNAME }}';
-              export DATASOURCE_PASSWORD='${{ secrets.DATASOURCE_PASSWORD }}';
-              java -jar app.jar --spring.profiles.active=prod
-            \"
-
-            echo \"📝 Registrando log de deploy...\"
-            echo \"$(date) - Deploy realizado com hash ${{ github.sha }}\" >> /home/ubuntu/production/deploy.log
-
-            echo \"📋 Capturando log do tmux...\"
+            
+            echo "🔍 Verificando se o arquivo de backup existe..."
+            if [ -f app-backup.jar ]; then
+            echo "🔁 Restaurando versão anterior do JAR..."
+            mv -f app-backup.jar app.jar
+          
+            echo "🚀 Iniciando nova sessão tmux com rollback..."
+            tmux new-session -d -s app-prod "
+            export DATASOURCE_URL='${{ secrets.DATASOURCE_URL }}';
+            export DATASOURCE_USERNAME='${{ secrets.DATASOURCE_USERNAME }}';
+            export DATASOURCE_PASSWORD='${{ secrets.DATASOURCE_PASSWORD }}';
+            java -jar app.jar --spring.profiles.active=prod
+            "
+          
+            echo "📝 Registrando log de rollback..."
+            echo \"$(date) - Rollback realizado com hash ${{ github.sha }}\" >> /home/ubuntu/production/deploy.log
+          
+            echo "📋 Capturando log do tmux..."
             mkdir -p /home/ubuntu/production/logs
             tmux capture-pane -pt app-prod && tmux save-buffer /home/ubuntu/production/logs/last_tmux.log && tmux delete-buffer
-            " > /home/ubuntu/production/deploy_script.sh
-
+            else
+            echo "⚠️ Nenhum arquivo de backup encontrado. Rollback abortado."
+            exit 1
+            fi" > /home/ubuntu/production/deploy_script.sh
             chmod +x /home/ubuntu/production/deploy_script.sh
             bash /home/ubuntu/production/deploy_script.sh
           '
