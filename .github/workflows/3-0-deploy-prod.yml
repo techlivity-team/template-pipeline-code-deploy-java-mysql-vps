@@ -25,6 +25,12 @@ jobs:
         working-directory: app
         run: mvn clean package -DskipTests
 
+      - name: Renomear JAR gerado dinamicamente
+        run: |
+          JAR_FILE=$(find app/target -type f -name "*.jar" | head -n 1)
+          echo "JAR encontrado: $JAR_FILE"
+          cp "$JAR_FILE" app/target/app.jar
+
       - name: Verificar se o JAR foi gerado
         run: ls -lh app/target/
 
@@ -32,7 +38,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-jar
-          path: app/target/api-teste-mysql-0.0.1-SNAPSHOT.jar
+          path: app/target/app.jar
 
   upload:
     name: 🚀 Enviar JAR para VPS
@@ -46,23 +52,36 @@ jobs:
           name: app-jar
 
       - name: Verificar conteúdo do diretório atual
-        run: |
-          ls -lh
+        run: ls -lh
 
       - name: Instalar sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
+      - name: Backup da versão anterior
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" \
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+          'mkdir -p /home/ubuntu/production/backups && \
+           if [ -f /home/ubuntu/production/app.jar ]; then \
+             cp /home/ubuntu/production/app.jar /home/ubuntu/production/backups/app-$(date +%Y%m%d%H%M%S).jar; \
+           fi'
+
+      - name: Limpar backups antigos (10+ dias)
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" \
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+          'find /home/ubuntu/production/backups/ -type f -mtime +10 -delete'
+
       - name: Copiar JAR para VPS
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" \
-          ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=no \
-          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p /home/ubuntu/production"
-          
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" \
-          scp -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=no \
-          api-teste-mysql-0.0.1-SNAPSHOT.jar \
-          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/production/
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+          "mkdir -p /home/ubuntu/production"
 
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" \
+          scp -o StrictHostKeyChecking=no \
+          app.jar \
+          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/production/app.jar
 
   shutdown:
     name: 🛑 Parar instância antiga
@@ -74,8 +93,7 @@ jobs:
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            'PID=$(lsof -ti:8080); \
-             if [ -n "$PID" ]; then kill -9 $PID; fi'
+            'PID=$(lsof -ti:8080); if [ -n "$PID" ]; then kill -9 $PID; fi'
 
   deploy:
     name: 🚦 Iniciar aplicação via tmux
@@ -92,7 +110,9 @@ jobs:
              tmux new-session -d -s app-prod "export DATASOURCE_URL=${{ secrets.DATASOURCE_URL }} && \
                                               export DATASOURCE_USERNAME=${{ secrets.DATASOURCE_USERNAME }} && \
                                               export DATASOURCE_PASSWORD=${{ secrets.DATASOURCE_PASSWORD }} && \
-                                              java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod"'
+                                              java -jar app.jar --spring.profiles.active=prod" && \
+             echo \"$(date) - Novo deploy com hash ${{ github.sha }}\" >> /home/ubuntu/production/deploy.log && \
+             sleep 5 && lsof -i :8080'
 
   health-check:
     name: 🩺 Verificar aplicação
@@ -105,7 +125,7 @@ jobs:
 
       - name: Verificar status ou disparar rollback
         run: |
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.VPS_HOST }}:8080/actuator/health)
+          HTTP_STATUS=$(curl -s -o /dev/null --max-time 10 -w "%{http_code}" http://${{ secrets.VPS_HOST }}:8080/actuator/health)
           if [ "$HTTP_STATUS" -ne 200 ]; then
             echo "❌ Health check falhou com status: $HTTP_STATUS"
 
@@ -120,7 +140,6 @@ jobs:
             echo "✅ Aplicação no ar (200 OK)"
           fi
 
-
   logs:
     name: 📜 Logs
     runs-on: ubuntu-latest
@@ -131,4 +150,4 @@ jobs:
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-          'tail -n 200 /home/ubuntu/production/logs/app.log'
+          'tail -n 200 /home/ubuntu/production/logs/app.log || echo "⚠️ Arquivo de log não encontrado"'
