@@ -82,4 +82,7 @@ Evitar que o sistema fique inoperante ao implantar uma versão com falha em prod
 - `.github/workflows/prod.yml` → Deploy automatizado em produção com health check.
 - `.github/workflows/rollback.yml` → Restaurar a versão anterior se falhar o health.
 
+## Como configurar essa pipeline para um projeto 👷
+
+...
 ---
