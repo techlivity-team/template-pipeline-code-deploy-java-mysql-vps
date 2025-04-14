@@ -103,15 +103,23 @@ jobs:
       - name: Esperar aplicação subir
         run: sleep 15
 
-      - name: Verificar status
+      - name: Verificar status ou disparar rollback
         run: |
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.VPS_HOST }}:8080/actuator/health)
           if [ "$HTTP_STATUS" -ne 200 ]; then
-            echo "❌ Falha no Health Check. Status: $HTTP_STATUS"
+            echo "❌ Health check falhou com status: $HTTP_STATUS"
+
+            curl -X POST https://api.github.com/repos/${{ github.repository }}/actions/workflows/rollback.yml/dispatches \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              -d '{"ref":"main"}'
+
             exit 1
           else
-            echo "✅ Aplicação está no ar (200 OK)"
+            echo "✅ Aplicação no ar (200 OK)"
           fi
+
 
   logs:
     name: 📜 Logs
