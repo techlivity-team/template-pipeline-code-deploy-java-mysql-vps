@@ -1,4 +1,4 @@
-name: CI - Pull Request Validation
+name: 2 Promotion To Production
 
 on:
   pull_request:

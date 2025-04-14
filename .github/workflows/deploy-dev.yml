@@ -1,4 +1,4 @@
-name: Deploy Dev to VPS
+name: 1 Deploy Dev to VPS
 
 on:
   pull_request:
@@ -24,8 +24,11 @@ jobs:
         working-directory: app
         run: mvn clean package -DskipTests
 
+      - name: Verificar se o JAR foi gerado
+        run: ls -lh app/target/
+
       - name: Salvar artefato
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: app-jar-dev
           path: app/target/api-teste-mysql-0.0.1-SNAPSHOT.jar
@@ -37,39 +40,42 @@ jobs:
 
     steps:
       - name: Baixar artefato
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: app-jar-dev
+
+      - name: Verificar conteúdo do diretório atual
+        run: ls -lh
 
       - name: Instalar sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
       - name: Copiar JAR para VPS
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp -o StrictHostKeyChecking=no \
-            api-teste-mysql-0.0.1-SNAPSHOT.jar \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/develop
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" \
+          ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=no \
+          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p /home/ubuntu/develop"
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" \
+          scp -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=no \
+          api-teste-mysql-0.0.1-SNAPSHOT.jar \
+          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/develop/
 
   shutdown:
-    name: 🛑 Parar app na porta 8081
+    name: 🛑 Parar instância antiga (dev)
     runs-on: ubuntu-latest
     needs: upload
 
     steps:
-      - name: Encerrar processo anterior (8081)
+      - name: Finalizar processo antigo (porta 8081)
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            'PID=$(lsof -ti:8081); \
-             if [ -n "$PID" ]; then \
-               echo "🔴 Encerrando processo na porta 8081 (PID=$PID)"; \
-               kill -9 $PID; \
-             else \
-               echo "✅ Nenhum processo na porta 8081"; \
-             fi'
+          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+          'PID=$(lsof -ti:8081); \
+           if [ -n "$PID" ]; then kill -9 $PID; fi'
 
   deploy:
-    name: 🚦 Iniciar app via tmux (dev)
+    name: 🚦 Iniciar aplicação via tmux (dev)
     runs-on: ubuntu-latest
     needs: shutdown
 
@@ -77,27 +83,27 @@ jobs:
       - name: Rodar aplicação via tmux
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            'tmux kill-session -t app-dev 2>/dev/null || true && \
-             cd /home/ubuntu/develop && \
-             tmux new-session -d -s app-dev "java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev" && \
-             echo "✅ Aplicação iniciada via tmux."'
+          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+          'tmux kill-session -t app-dev 2>/dev/null || true && \
+           cd /home/ubuntu/develop && \
+           tmux new-session -d -s app-dev "java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev"'
 
   health-check:
-    name: 🩺 Health Check (dev)
+    name: 🩺 Verificar aplicação (dev)
     runs-on: ubuntu-latest
     needs: deploy
 
     steps:
-      - name: Aguardar subida da aplicação
+      - name: Esperar aplicação subir
         run: sleep 20
 
       - name: Verificar status
         run: |
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.VPS_HOST }}:8081/actuator/health)
           if [ "$HTTP_STATUS" -ne 200 ]; then
-            echo "❌ Aplicação não respondeu com status 200. Status recebido: $HTTP_STATUS"
+            echo "❌ Falha no Health Check. Status: $HTTP_STATUS"
             exit 1
           else
-            echo "✅ Aplicação respondeu com sucesso (status 200)"
+            echo "✅ Aplicação está no ar (200 OK)"
           fi
+    

@@ -1,4 +1,4 @@
-name: Deploy to Production VPS
+name: 3 Deploy to Production VPS
 
 on:
   push:
