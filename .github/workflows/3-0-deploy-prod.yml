@@ -94,7 +94,7 @@ jobs:
               tmux new-session -d -s app-prod bash -c \"export DATASOURCE_URL=${{ secrets.DATASOURCE_URL }}'; \
               export DATASOURCE_USERNAME=${{ secrets.DATASOURCE_USERNAME }}; \
               export DATASOURCE_PASSWORD=${{ secrets.DATASOURCE_PASSWORD }}; \
-              java -jar app.jar --spring.profiles.active=prod\"
+              java -jar /home/ubuntu/production/app.jar --spring.profiles.active=prod\"
             '
 
   health-check:
