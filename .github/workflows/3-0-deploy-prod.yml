@@ -61,6 +61,14 @@ jobs:
       - name: Instalar sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
+      - name: Backup da versão anterior
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'if [ -f /home/ubuntu/production/app.jar ]; then \
+               cp /home/ubuntu/production/app.jar /home/ubuntu/production/app-prev.jar; \
+             fi'
+
       - name: Criar diretório de deploy e enviar JAR
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
@@ -96,10 +104,10 @@ jobs:
              tmux new-session -d -s app-prod "export DATASOURCE_URL=${{ secrets.DATASOURCE_URL }} && \
                                               export DATASOURCE_USERNAME=${{ secrets.DATASOURCE_USERNAME }} && \
                                               export DATASOURCE_PASSWORD=${{ secrets.DATASOURCE_PASSWORD }} && \
-                                              java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod"'
+                                              java -jar app.jar --spring.profiles.active=prod"'
 
   health-check:
-    name: 🩺 Verificar aplicação
+    name: 🧽 Verificar aplicação
     runs-on: ubuntu-latest
     needs: deploy
 
@@ -117,10 +125,48 @@ jobs:
             echo "✅ Aplicação no ar (200 OK)"
           fi
 
+  rollback:
+    name: ♻️ Rollback se falhar
+    runs-on: ubuntu-latest
+    needs: health-check
+    if: failure()
+
+    steps:
+      - name: Parar processo com falha
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'PID=$(lsof -ti:8080); if [ -n "$PID" ]; then kill -9 $PID; fi'
+
+      - name: Iniciar versão anterior (rollback)
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'tmux kill-session -t app-prod 2>/dev/null || true && \
+             cd /home/ubuntu/production && \
+             tmux new-session -d -s app-prod "export DATASOURCE_URL=${{ secrets.DATASOURCE_URL }} && \
+                                              export DATASOURCE_USERNAME=${{ secrets.DATASOURCE_USERNAME }} && \
+                                              export DATASOURCE_PASSWORD=${{ secrets.DATASOURCE_PASSWORD }} && \
+                                              java -jar app-prev.jar --spring.profiles.active=prod"'
+
+      - name: Aguardar versão anterior subir
+        run: sleep 15
+
+      - name: Verificar status após rollback
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null --max-time 10 -w "%{http_code}" http://${{ secrets.VPS_HOST }}:8080/actuator/health)
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "❌ Rollback também falhou com status: $HTTP_STATUS"
+            exit 1
+          else
+            echo "✅ Rollback funcionou! Aplicação anterior no ar (200 OK)"
+          fi
+
   logs:
     name: 📜 Logs
     runs-on: ubuntu-latest
-    needs: health-check
+    needs: [health-check, rollback]
+    if: always()
 
     steps:
       - name: Ler logs da aplicação
@@ -128,3 +174,4 @@ jobs:
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
           'tail -n 200 /home/ubuntu/production/logs/app.log || echo "⚠️ Arquivo de log não encontrado"'
+
