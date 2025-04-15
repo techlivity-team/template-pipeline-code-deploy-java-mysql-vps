@@ -90,12 +90,13 @@ jobs:
       - name: Iniciar aplicação
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
-              tmux new-session -d -s app-prod bash -c \"export DATASOURCE_URL=${{ secrets.DATASOURCE_URL }}'; \
-              export DATASOURCE_USERNAME=${{ secrets.DATASOURCE_USERNAME }}; \
-              export DATASOURCE_PASSWORD=${{ secrets.DATASOURCE_PASSWORD }}; \
-              java -jar /home/ubuntu/production/app.jar --spring.profiles.active=prod\"
-            '
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'tmux kill-session -t app-prod 2>/dev/null || true && \
+             cd /home/ubuntu/production && \
+             tmux new-session -d -s app-prod "export DATASOURCE_URL=${{ secrets.DATASOURCE_URL }} && \
+                                              export DATASOURCE_USERNAME=${{ secrets.DATASOURCE_USERNAME }} && \
+                                              export DATASOURCE_PASSWORD=${{ secrets.DATASOURCE_PASSWORD }} && \
+                                              java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod"'
 
   health-check:
     name: 🩺 Verificar aplicação
