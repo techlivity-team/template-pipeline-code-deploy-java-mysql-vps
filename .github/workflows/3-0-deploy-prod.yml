@@ -108,45 +108,57 @@ jobs:
     needs: shutdown
 
     steps:
-      - name: Deploy na VPS via script remoto
+      - name: Baixar nome do JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: jar-name
+
+      - name: Copiar script de rollback para VPS
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
-          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
-          echo "#!/bin/bash
+          JAR_NAME=$(cat jar_name.txt)
+          echo '#!/bin/bash
           set -e
-          
+
           echo "➡️ Iniciando rollback para versão anterior..."
           cd /home/ubuntu/production || exit 1
-          
+
           echo "🛑 Encerrando sessão tmux anterior (se existir)..."
           tmux kill-session -t app-prod 2>/dev/null || true
-          
+
           echo "🔍 Verificando se o arquivo de backup existe..."
-          if [ -f api-teste-mysql-0.0.1-SNAPSHOT.jar ]; then  # Verifica o arquivo com o nome correto
-          echo "🔁 Restaurando versão anterior do JAR..."
-          cp api-teste-mysql-0.0.1-SNAPSHOT.jar api-teste-mysql-previous.jar
-        
-          echo "🚀 Iniciando nova sessão tmux..."
-          tmux new-session -d -s app-prod "bash -c 'export DATASOURCE_URL=${{ secrets.DATASOURCE_URL }}'; \
-          export DATASOURCE_USERNAME=${{ secrets.DATASOURCE_USERNAME }}; \
-          export DATASOURCE_PASSWORD=${{ secrets.DATASOURCE_PASSWORD }}; \
-          java -jar app.jar --spring.profiles.active=prod'"
-        
-          echo "📝 Registrando log de rollback..."
-          echo "$(date) - Rollback realizado com hash ${{ github.sha }}" >> /home/ubuntu/production/deploy.log
-        
-          echo "📋 Capturando log do tmux..."
-          mkdir -p /home/ubuntu/production/logs
-          tmux capture-pane -pt app-prod && tmux save-buffer /home/ubuntu/production/logs/last_tmux.log && tmux delete-buffer
-          
+          if [ -f $JAR_NAME ]; then
+            echo "🔁 Restaurando versão anterior do JAR..."
+            cp $JAR_NAME app.jar
+
+            echo "🚀 Iniciando nova sessão tmux..."
+            tmux new-session -d -s app-prod "bash -c '\''export DATASOURCE_URL=${DATASOURCE_URL}; \
+            export DATASOURCE_USERNAME=${DATASOURCE_USERNAME}; \
+            export DATASOURCE_PASSWORD=${DATASOURCE_PASSWORD}; \
+            java -jar app.jar --spring.profiles.active=prod'\''"
+
+            echo "📝 Registrando log de rollback..."
+            echo \"$(date) - Rollback realizado com hash ${GITHUB_SHA}\" >> /home/ubuntu/production/deploy.log
+
+            echo "📋 Capturando log do tmux..."
+            mkdir -p /home/ubuntu/production/logs
+            tmux capture-pane -pt app-prod && tmux save-buffer /home/ubuntu/production/logs/last_tmux.log && tmux delete-buffer
           else
-          echo "⚠️ Nenhum backup encontrado. Rollback abortado."
-          exit 1
-          fi
-          " > /home/ubuntu/production/deploy_script.sh
-            chmod +x /home/ubuntu/production/deploy_script.sh
-            bash /home/ubuntu/production/deploy_script.sh
-          '
+            echo "⚠️ Nenhum backup encontrado. Rollback abortado."
+            exit 1
+          fi' > rollback.sh
+
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp -o StrictHostKeyChecking=no rollback.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/production/rollback.sh
+
+      - name: Executar script na VPS
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "
+            export DATASOURCE_URL='${{ secrets.DATASOURCE_URL }}'
+            export DATASOURCE_USERNAME='${{ secrets.DATASOURCE_USERNAME }}'
+            export DATASOURCE_PASSWORD='${{ secrets.DATASOURCE_PASSWORD }}'
+            export GITHUB_SHA='${{ github.sha }}'
+            chmod +x /home/ubuntu/production/rollback.sh
+            bash /home/ubuntu/production/rollback.sh
+          "
 
   health-check:
     name: 🩺 Verificar aplicação
