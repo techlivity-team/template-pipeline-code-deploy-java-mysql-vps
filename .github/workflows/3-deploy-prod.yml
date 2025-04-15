@@ -90,7 +90,7 @@ jobs:
             'PID=$(lsof -ti:8080); if [ -n "$PID" ]; then kill -9 $PID; fi'
 
   deploy:
-    name: 🚦 Iniciar aplicação via tmux
+    name: 🚦 Iniciar implantação de nova versão
     runs-on: ubuntu-latest
     needs: shutdown
 
@@ -107,7 +107,7 @@ jobs:
                                               java -jar app.jar --spring.profiles.active=prod"'
 
   health-check:
-    name: 🧽 Verificar aplicação
+    name: 🩺 Verificar saúde da aplicação
     runs-on: ubuntu-latest
     needs: deploy
 
@@ -126,7 +126,7 @@ jobs:
           fi
 
   rollback:
-    name: ♻️ Rollback se falhar
+    name: ♻️ Rollback de versão se falhar
     runs-on: ubuntu-latest
     needs: health-check
     if: failure()
@@ -163,7 +163,7 @@ jobs:
           fi
 
   logs:
-    name: 📜 Logs
+    name: 📜 Logs da aplicação para debug
     runs-on: ubuntu-latest
     needs: [health-check, rollback]
     if: always()
