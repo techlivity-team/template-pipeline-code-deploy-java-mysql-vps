@@ -1,88 +1,101 @@
-# 📦 Documentação de CI/CD com GitHub Actions
+# 🚀 Projeto CI/CD com GitHub Actions - Spring Boot
 
-Este projeto utiliza uma pipeline CI/CD com GitHub Actions para automatizar os processos de build, validação e deploy em diferentes ambientes: desenvolvimento, validação e produção.
-
----
-
-## 🛠️ Ambientes
-
-### 1. Desenvolvimento (`local`)
-- **Acionado em qualquer push ou PR na branch `develop`**.
-- Etapas:
-    - Build da aplicação com Maven.
-    - Execução dos testes automatizados.
-    - Deploy automático na VPS em modo de desenvolvimento (`--spring.profiles.active=local`), escutando na porta 8081.
-
-### 2. Validação / Promoção para Produção
-- **Acontece via Pull Request da branch `develop` para `main`**.
-- Etapas:
-    - Build e execução dos testes.
-    - Análise de código com checkstyle do maven, por padrão configurado o style do `google`.
-    - Validação do pipeline (CI).
-    - _Não_ realiza deploy neste momento, apenas valida se o código pode ir para produção.
-
-### 3. Produção (`prod`)
-- **Acionado automaticamente após merge na branch `main`**.
-- Etapas:
-    - Build com Maven e empacotamento do JAR.
-    - Envio do artefato para a VPS via `scp`.
-    - Encerramento da versão antiga (parando o processo anterior).
-    - Execução do novo JAR em `tmux`, com perfil `prod`.
-    - Verificação de health check com `/actuator/health`.
-    - Caso o health check falhe (status diferente de 200), um novo workflow de rollback é disparado automaticamente via API do GitHub.
+Este repositório contém uma aplicação Java com Spring Boot que utiliza uma pipeline de CI/CD automatizada com **GitHub Actions**, realizando deploys em ambientes de **desenvolvimento** e **produção**, com validações de código e mecanismo de rollback.
 
 ---
 
-## 🔁 Mecanismo de Rollback
+## 🛠️ Tecnologias Utilizadas
 
-### Objetivo
-Evitar que o sistema fique inoperante ao implantar uma versão com falha em produção.
-
-### Estratégia
-- Antes de fazer o deploy, a versão anterior do JAR é movida para `/home/ubuntu/backup/`.
-- Após o deploy, o sistema aguarda 15 segundos e verifica o endpoint de health.
-- Se falhar (HTTP diferente de 200):
-    - Um workflow separado (`rollback.yml`) é acionado via `curl` para restaurar a versão anterior.
-
-### Segurança
-- O token `GITHUB_TOKEN` é usado com permissão para disparar outros workflows de forma segura.
+- Java 17
+- Spring Boot
+- Maven
+- GitHub Actions
+- SSH + SCP + Tmux
+- VPS com Ubuntu 24.04
+- Health Check HTTP
 
 ---
 
-## 📊 Justificativas Técnicas
+## 📁 Estrutura da Pipeline
 
-### GitHub Actions
-- Facilidade de integração com GitHub.
-- Token automático (`GITHUB_TOKEN`) para autenticação segura entre workflows.
-- Estrutura de jobs permite controle granular dos passos e execuções condicionais.
+### 🔁 Workflows
 
-### SSH + SCP com `sshpass`
-- Simples para deploy em VPS Linux.
-- Evita configuração de chave pública/privada (usando senha segura via secrets).
+#### 1. **CI/CD - Desenvolvimento**
+> 📂 `.github/workflows/deploy-dev.yml`
 
-### Tmux
-- Permite manter a aplicação executando mesmo após desconexão da sessão SSH.
-- Gerenciamento simples com `tmux kill-session` e `tmux new-session`.
-
-### Health Check com `/actuator/health`
-- Endpoint padrão do Spring Boot para verificação de status.
-- Automatiza a validação pós-deploy.
+- **Gatilho**: Ao abrir um Pull Request na branch `develop`
+- **Etapas**:
+  - Build do projeto com Maven
+  - Envio do JAR via `scp` para a VPS
+  - Execução com `tmux` na porta 8081 com perfil `local`
+  - Verificação de Health Check
+  - Log de execução
+- ✅ Permite validação e testes em ambiente separado antes de ir para produção.
 
 ---
 
-## 🔄 Fluxo Resumido
+#### 2. **CI - Validação de Código**
+> 📂 `.github/workflows/code-check.yml`
 
-![diagrama](diagram.png)
+- **Gatilho**: Ao abrir um Pull Request na branch `main`
+- **Etapas**:
+  - Build do projeto com Maven
+  - Execução de testes automatizados
+  - Análise de código (ex: validação de style/lint)
+
 ---
 
-## 📁 Estrutura de Workflows
+#### 3. **CD - Produção com Rollback**
+> 📂 `.github/workflows/deploy-prod.yml`
 
-- `.github/workflows/dev.yml` → Deploy automático para ambiente local.
-- `.github/workflows/validate.yml` → Build e validação do PR para produção.
-- `.github/workflows/prod.yml` → Deploy automatizado em produção com health check.
-- `.github/workflows/rollback.yml` → Restaurar a versão anterior se falhar o health.
+- **Gatilho**: Ao fazer `push` na branch `main`
+- **Etapas**:
+  - Build do projeto com Maven
+  - Envio do JAR para a VPS
+  - Parada da aplicação anterior
+  - Execução do novo JAR via `tmux` (porta 8080, perfil `prod`)
+  - Verificação do Health Check (ex: `/actuator/health`)
+  - ✅ Se sucesso: logs e finalização
+  - ❌ Se falha: rollback automático para o JAR anterior
 
-## Como configurar essa pipeline para um projeto 👷
-
-...
 ---
+
+## 🔐 Secrets Utilizados
+
+Configure os seguintes secrets no GitHub:
+
+| Nome                  | Descrição                          |
+|-----------------------|------------------------------------|
+| `VPS_HOST`            | Endereço IP ou domínio da VPS      |
+| `VPS_USERNAME`        | Usuário de acesso SSH              |
+| `VPS_PASSWORD`        | Senha de acesso via `sshpass`      |
+
+---
+
+## ⚙️ Requisitos da VPS
+
+- Porta 22 liberada (SSH)
+- Java 17 instalado
+- Diretório `/home/<usuário>/app` disponível
+- `tmux`, `sshpass`, `scp`, `curl` instalados
+
+---
+
+## 📊 Monitoramento
+
+- A aplicação possui endpoint de health check (`/actuator/health`)
+- Logs disponíveis via `tmux` ou redirect para arquivo `logs.txt`
+
+---
+
+## 📌 Observações
+
+- O nome do JAR é gerado dinamicamente no momento do build.
+- É possível realizar rollback automático em produção, garantindo resiliência em falhas.
+
+---
+
+## 📄 Licença
+
+Este projeto está licenciado sob a [MIT License](LICENSE).
+
