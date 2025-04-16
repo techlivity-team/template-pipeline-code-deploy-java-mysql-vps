@@ -24,6 +24,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Obter versão atual do Maven
+        working-directory: app
         id: get-version
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
@@ -32,6 +33,7 @@ jobs:
           echo "new_version=$NEW_MAJOR.0.0" >> "$GITHUB_OUTPUT"
 
       - name: Atualizar versão no POM
+        working-directory: app
         run: mvn versions:set -DnewVersion=${{ steps.get-version.outputs.new_version }} -DgenerateBackupPoms=false
 
       - name: Commit da nova versão
