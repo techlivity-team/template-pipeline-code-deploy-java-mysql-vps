@@ -99,7 +99,7 @@ jobs:
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-             cd /home/ubuntu/production && \
+             'cd /home/ubuntu/production && \
              tmux new-session -d -s app-prod "export DATASOURCE_URL=${{ secrets.DATASOURCE_URL }} && \
                                               export DATASOURCE_USERNAME=${{ secrets.DATASOURCE_USERNAME }} && \
                                               export DATASOURCE_PASSWORD=${{ secrets.DATASOURCE_PASSWORD }} && \
