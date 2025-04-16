@@ -27,6 +27,6 @@ public class UserController {
 
     @GetMapping("/test")
     public String test() {
-        return "ok 3";
+        return "ok";
     }
 }
