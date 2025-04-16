@@ -1,0 +1,41 @@
+name: Bump Maven Version on Feature Merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - develop
+
+jobs:
+  bump-version:
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'feature/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+        with:
+          ref: develop
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Obter versão atual do Maven
+        id: get-version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          NEW_MAJOR=$((MAJOR + 1))
+          echo "new_version=$NEW_MAJOR.0.0" >> "$GITHUB_OUTPUT"
+
+      - name: Atualizar versão no POM
+        run: mvn versions:set -DnewVersion=${{ steps.get-version.outputs.new_version }} -DgenerateBackupPoms=false
+
+      - name: Commit da nova versão
+        run: |
+          git add pom.xml
+          git commit -m "chore: bump version to ${{ steps.get-version.outputs.new_version }}"
+          git push origin develop
