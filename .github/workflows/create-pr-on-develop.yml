@@ -1,0 +1,34 @@
+name: Auto PR Develop to Main
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  create-pull-request:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repositório
+        uses: actions/checkout@v3
+
+      - name: Instalar GitHub CLI
+        run: |
+          sudo apt update
+          sudo apt install gh -y
+
+      - name: Verificar e criar PR da develop para main
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          gh auth login --with-token <<< "$GH_TOKEN"
+          
+          # Verifica se já existe um PR da develop para main
+          if gh pr list --base main --head develop --state open --json number --jq '.[].number' | grep -q .; then
+            echo "✅ PR da develop para main já existe. Nada a fazer."
+          else
+            gh pr create --base main --head develop \
+              --title "Promoção de ambiente de desenvolvimento para Produção" \
+              --body "PR automático criado pelo GitHub Actions para promover as alterações da branch develop para main."
+            echo "🚀 PR criado com sucesso!"
+          fi
