@@ -37,6 +37,7 @@ jobs:
         run: mvn versions:set -DnewVersion=${{ steps.get-version.outputs.new_version }} -DgenerateBackupPoms=false
 
       - name: Commit da nova versão
+        working-directory: app
         run: |
           git add pom.xml
           git commit -m "chore: bump version to ${{ steps.get-version.outputs.new_version }}"
