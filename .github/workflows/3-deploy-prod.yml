@@ -143,12 +143,14 @@ jobs:
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            'tmux kill-session -t app-prod 2>/dev/null || true && \
-             cd /home/ubuntu/production && \
-             tmux new-session -d -s app-prod "export DATASOURCE_URL=${{ secrets.DATASOURCE_URL }} && \
-                                              export DATASOURCE_USERNAME=${{ secrets.DATASOURCE_USERNAME }} && \
-                                              export DATASOURCE_PASSWORD=${{ secrets.DATASOURCE_PASSWORD }} && \
-                                              java -jar app-prev.jar --spring.profiles.active=prod"'
+            "tmux kill-session -t app-prod 2>/dev/null || true && \
+            cd /home/ubuntu/production && \
+            tmux new-session -d -s app-prod \
+            'java \
+            -Dspring.datasource.url=${{ secrets.DATASOURCE_URL }} \
+            -Dspring.datasource.username=${{ secrets.DATASOURCE_USERNAME }} \
+            -Dspring.datasource.password=${{ secrets.DATASOURCE_PASSWORD }} \
+            -jar app-prev.jar --spring.profiles.active=prod'"
 
       - name: Aguardar versão anterior subir
         run: sleep 15
