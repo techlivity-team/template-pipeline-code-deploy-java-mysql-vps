@@ -17,11 +17,11 @@ jobs:
           sudo apt update
           sudo apt install gh -y
 
-      - name: Verificar e criar PR da develop para main
+      - name: Criar PR da develop para main automaticamente
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh auth login --with-token <<< "$GH_TOKEN"
+          echo "🔐 Usando token para autenticação no GitHub CLI"
           
           # Verifica se já existe um PR da develop para main
           if gh pr list --base main --head develop --state open --json number --jq '.[].number' | grep -q .; then
