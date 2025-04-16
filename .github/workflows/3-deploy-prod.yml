@@ -105,7 +105,7 @@ jobs:
             -Dspring.datasource.url=${{ secrets.DATASOURCE_URL }} \
             -Dspring.datasource.username=${{ secrets.DATASOURCE_USERNAME }} \
             -Dspring.datasource.password=${{ secrets.DATASOURCE_PASSWORD }} \
-            -jar app.jar --spring.profiles.active=prod"
+            -jar app.jar --spring.profiles.active=prod'"
 
   health-check:
     name: 🩺 Verificar saúde da aplicação
