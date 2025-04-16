@@ -99,12 +99,13 @@ jobs:
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-          "cd /home/ubuntu/production && \          
-           DATASOURCE_URL='${{ secrets.DATASOURCE_URL }}' \
-           DATASOURCE_USERNAME='${{ secrets.DATASOURCE_USERNAME }}' \
-           DATASOURCE_PASSWORD='${{ secrets.DATASOURCE_PASSWORD }}' \
+          "cd /home/ubuntu/production && \
            tmux new-session -d -s app-prod \
-           'java -jar app.jar --spring.profiles.active=prod'"
+           'java \
+            -Dspring.datasource.url=${{ secrets.DATASOURCE_URL }} \
+            -Dspring.datasource.username=${{ secrets.DATASOURCE_USERNAME }} \
+            -Dspring.datasource.password=${{ secrets.DATASOURCE_PASSWORD }} \
+            -jar app.jar --spring.profiles.active=prod"
 
   health-check:
     name: 🩺 Verificar saúde da aplicação
