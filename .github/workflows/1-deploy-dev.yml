@@ -10,28 +10,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout código
+      - name: 📥 Checkout código
         uses: actions/checkout@v3
 
-      - name: Instalar JDK
+      - name: ☕ Instalar JDK
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
           cache: maven
 
-      - name: Build com Maven
+      - name: 🔨 Build com Maven
         working-directory: app
         run: mvn clean package -DskipTests
 
-      - name: Verificar se o JAR foi gerado
+      - name: 📂 Verificar se o JAR foi gerado
         run: ls -lh app/target/
 
-      - name: Salvar artefato
+      - name: 📦 Salvar artefato gerado dinamicamente
         uses: actions/upload-artifact@v4
         with:
           name: app-jar-dev
-          path: app/target/api-teste-mysql-0.0.1-SNAPSHOT.jar
+          path: app/target/*.jar  # detecta automaticamente qualquer JAR gerado
 
   upload:
     name: 🚀 Enviar JAR (dev) para VPS
@@ -39,27 +39,35 @@ jobs:
     needs: build
 
     steps:
-      - name: Baixar artefato
+      - name: 📥 Baixar artefato
         uses: actions/download-artifact@v4
         with:
           name: app-jar-dev
 
-      - name: Verificar conteúdo do diretório atual
+      - name: 📂 Verificar JAR baixado
         run: ls -lh
 
-      - name: Instalar sshpass
+      - name: 🔑 Instalar sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Copiar JAR para VPS
+      - name: 📤 Copiar JAR para VPS
         run: |
+          FILE_NAME=$(ls *.jar)
+          echo "Arquivo detectado: $FILE_NAME"
+
           sshpass -p "${{ secrets.VPS_PASSWORD }}" \
           ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=no \
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p /home/ubuntu/develop"
-          
+
           sshpass -p "${{ secrets.VPS_PASSWORD }}" \
           scp -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=no \
-          api-teste-mysql-0.0.1-SNAPSHOT.jar \
+          "$FILE_NAME" \
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/develop/
+
+      - name: 📝 Salvar nome do arquivo para o próximo job
+        run: |
+          FILE_NAME=$(ls *.jar)
+          echo "JAR_NAME=$FILE_NAME" >> $GITHUB_ENV
 
   shutdown:
     name: 🛑 Parar instância antiga (dev)
@@ -67,7 +75,7 @@ jobs:
     needs: upload
 
     steps:
-      - name: Finalizar processo antigo (porta 8081)
+      - name: 🔻 Finalizar processo antigo (porta 8081)
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
@@ -80,13 +88,13 @@ jobs:
     needs: shutdown
 
     steps:
-      - name: Rodar aplicação via tmux
+      - name: 🚀 Iniciar aplicação na VPS
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-          'tmux kill-session -t app-dev 2>/dev/null || true && \
+          'JAR_NAME=$(ls /home/ubuntu/develop/*.jar | xargs -n1 basename); \
            cd /home/ubuntu/develop && \
-           tmux new-session -d -s app-dev "java -jar api-teste-mysql-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev"'
+           tmux new-session -d -s app-dev "java -jar $JAR_NAME --spring.profiles.active=dev"'
 
   health-check:
     name: 🩺 Verificar aplicação (dev)
@@ -94,10 +102,10 @@ jobs:
     needs: deploy
 
     steps:
-      - name: Esperar aplicação subir
+      - name: ⏳ Esperar aplicação subir
         run: sleep 20
 
-      - name: Verificar status
+      - name: ✅ Verificar status
         run: |
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.VPS_HOST }}:8081/actuator/health)
           if [ "$HTTP_STATUS" -ne 200 ]; then
@@ -106,4 +114,3 @@ jobs:
           else
             echo "✅ Aplicação está no ar (200 OK)"
           fi
-    
