@@ -50,6 +50,13 @@ jobs:
       - name: 🔑 Instalar sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
+      - name: 🔄 Limpeza de arquivos antigos para novo recebimento
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" \
+          ssh -o StrictHostKeyChecking=no \
+          ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+          'rm -rf /home/ubuntu/develop/*'
+
       - name: 📤 Copiar JAR para VPS
         run: |
           FILE_NAME=$(ls *.jar)
