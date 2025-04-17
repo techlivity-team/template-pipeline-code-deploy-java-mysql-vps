@@ -178,3 +178,46 @@ jobs:
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
           'tail -n 200 /home/ubuntu/production/logs/app.log || echo "⚠️ Arquivo de log não encontrado"'
 
+  create-release:
+    name: 📦 Criar Release
+    runs-on: ubuntu-latest
+    needs: health-check
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # necessário para obter histórico de tags
+
+      - name: Ler versão do Maven
+        id: version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "Versão extraída do pom.xml: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Criar tag (se ainda não existir)
+        run: |
+          git fetch --tags
+          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "Tag v${{ steps.version.outputs.version }} já existe."
+          else
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+            git tag "v${{ steps.version.outputs.version }}"
+            git push origin "v${{ steps.version.outputs.version }}"
+          fi
+
+      - name: Criar release no GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Versão ${{ steps.version.outputs.version }}
+          body: |
+            🚀 Nova versão implantada com sucesso!
+            ✅ Commits incluídos:
+
+            $(git log $(git describe --tags --abbrev=0)^..HEAD --pretty=format:"- %s (%an)")
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
