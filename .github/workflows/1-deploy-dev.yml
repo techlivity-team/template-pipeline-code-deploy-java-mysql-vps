@@ -75,12 +75,14 @@ jobs:
     needs: upload
 
     steps:
-      - name: 🔻 Finalizar processo antigo (porta 8081)
+      - name: 🔻 Finalizar processo antigo (porta 8081 e sessão tmux)
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no \
           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
           'PID=$(lsof -ti:8081); \
-           if [ -n "$PID" ]; then kill -9 $PID; fi'
+           if [ -n "$PID" ]; then kill -9 $PID; fi; \
+           if tmux has-session -t app-dev 2>/dev/null; then tmux kill-session -t app-dev; fi'
+
 
   deploy:
     name: 🚦 Iniciar aplicação via tmux (dev)
