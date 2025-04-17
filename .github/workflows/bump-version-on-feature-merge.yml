@@ -1,0 +1,66 @@
+name: Bump Maven Version on Feature Merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - develop
+
+permissions:
+  contents: write
+  pull-requests: write
+  repository-projects: write
+
+jobs:
+  bump-version:
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'feature/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      repository-projects: write
+
+    steps:
+      - name: Checkout código da develop
+        uses: actions/checkout@v3
+        with:
+          ref: develop
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Obter versão atual do Maven
+        working-directory: app
+        id: get-version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          NEW_MAJOR=$((MAJOR + 1))
+          echo "new_version=$NEW_MAJOR.0.0" >> "$GITHUB_OUTPUT"
+
+      - name: Atualizar versão no POM
+        working-directory: app
+        run: mvn versions:set -DnewVersion=${{ steps.get-version.outputs.new_version }} -DgenerateBackupPoms=false
+
+      - name: Commit da nova versão
+        working-directory: app
+        run: |
+          git add pom.xml
+          git commit -m "chore: bump version to ${{ steps.get-version.outputs.new_version }}"
+          git push origin develop
+
+      - name: Criar PR da develop para main (se ainda não existir)
+        run: |
+          if gh pr list --base main --head develop --state open --json number --jq '.[].number' | grep -q .; then
+            echo "✅ PR da develop para main já existe. Nada a fazer."
+          else
+            gh pr create --base main --head develop \
+              --title "Promoção de ambiente de desenvolvimento para Produção" \
+              --body "PR automático criado pelo GitHub Actions para promover as alterações da branch develop para main."
+            echo "🚀 PR criado com sucesso!"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
