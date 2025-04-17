@@ -190,6 +190,7 @@ jobs:
           fetch-depth: 0  # necessário para obter histórico de tags
 
       - name: Ler versão do Maven
+        working-directory: app
         id: version
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
@@ -208,16 +209,19 @@ jobs:
             git push origin "v${{ steps.version.outputs.version }}"
           fi
 
+      - name: Obter commits desde a última tag
+        id: changelog
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0)
+          echo "Última tag: $LAST_TAG"
+          COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%an)")
+          echo "$COMMITS" > changelog.txt
+
       - name: Criar release no GitHub
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: Versão ${{ steps.version.outputs.version }}
-          body: |
-            🚀 Nova versão implantada com sucesso!
-            ✅ Commits incluídos:
-
-            $(git log $(git describe --tags --abbrev=0)^..HEAD --pretty=format:"- %s (%an)")
-
+          body_path: changelog.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
