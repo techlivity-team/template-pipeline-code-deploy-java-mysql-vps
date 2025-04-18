@@ -200,22 +200,32 @@ jobs:
       - name: Criar tag (se ainda não existir)
         run: |
           git fetch --tags
-          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
-            echo "Tag v${{ steps.version.outputs.version }} já existe."
+          VERSION="v${{ steps.version.outputs.version }}"
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "Tag $VERSION já existe."
           else
             git config user.name "github-actions"
             git config user.email "github-actions@github.com"
-            git tag "v${{ steps.version.outputs.version }}"
-            git push origin "v${{ steps.version.outputs.version }}"
+            git tag "$VERSION"
+            git push origin "$VERSION"
           fi
 
-      - name: Obter commits desde a última tag
+      - name: Gerar changelog desde a última tag
         id: changelog
         run: |
-          LAST_TAG=$(git describe --tags --abbrev=0)
+          git fetch --tags
+          LAST_TAG=$(git describe --tags --abbrev=0 --match "v*" || echo "")
           echo "Última tag: $LAST_TAG"
-          COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%an)")
+
+          if [ -z "$LAST_TAG" ]; then
+            echo "⚠️ Nenhuma tag anterior encontrada. Listando todos os commits."
+            COMMITS=$(git log --pretty=format:"- %s (%an)")
+          else
+            COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%an)")
+          fi
+
           echo "$COMMITS" > changelog.txt
+          echo "$COMMITS"
 
       - name: Criar release no GitHub
         uses: softprops/action-gh-release@v2
