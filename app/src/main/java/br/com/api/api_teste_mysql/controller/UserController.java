@@ -38,6 +38,6 @@ public class UserController {
                 .addKeyValue("variable", variable)
                 .setMessage("validando teste")
                 .log();
-        return "ok";
+        return "ok feature";
     }
 }
