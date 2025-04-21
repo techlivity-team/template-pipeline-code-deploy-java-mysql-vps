@@ -3,12 +3,12 @@ name: Bump Maven Version on Feature Merge
 on:
   pull_request:
     types: [closed]
-    branches:
-      - develop
+    branches: [develop]
 
 permissions:
   contents: write
   pull-requests: write
+  issues: write
   repository-projects: write
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
       - name: Checkout código da develop
         uses: actions/checkout@v3
         with:
-          ref: develop
+          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configurar Git
@@ -29,7 +29,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Instalar GitHub CLI
-        run: sudo apt install gh
+        run: sudo apt-get update && sudo apt-get install -y gh
 
       - name: Obter label do PR
         id: pr-label
@@ -48,14 +48,13 @@ jobs:
             exit 1
           fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
       - name: Obter versão atual e calcular nova
         id: get-version
         working-directory: app
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-
           MAJOR=$(echo $VERSION | cut -d. -f1)
           MINOR=$(echo $VERSION | cut -d. -f2)
           PATCH=$(echo $VERSION | cut -d. -f3 | cut -d- -f1)
@@ -63,17 +62,13 @@ jobs:
           case "${{ steps.pr-label.outputs.version_type }}" in
             major)
               NEW_MAJOR=$((MAJOR + 1))
-              echo "new_version=$NEW_MAJOR.0.0" >> "$GITHUB_OUTPUT"
-              ;;
+              echo "new_version=$NEW_MAJOR.0.0" >> "$GITHUB_OUTPUT";;
             minor)
               NEW_MINOR=$((MINOR + 1))
-              echo "new_version=$MAJOR.$NEW_MINOR.0" >> "$GITHUB_OUTPUT"
-              ;;
+              echo "new_version=$MAJOR.$NEW_MINOR.0" >> "$GITHUB_OUTPUT";;
             patch)
               NEW_PATCH=$((PATCH + 1))
-              echo "new_version=$MAJOR.$MINOR.$NEW_PATCH" >> "$GITHUB_OUTPUT"
-              ;;
-          esac
+              echo "new_version=$MAJOR.$MINOR.$NEW_PATCH" >> "$GITHUB_OUTPUT";;
 
       - name: Atualizar versão no POM
         working-directory: app
@@ -86,6 +81,11 @@ jobs:
           git commit -m "chore: bump version to ${{ steps.get-version.outputs.new_version }}"
           git push origin develop
 
+      - name: Login do GitHub CLI com PAT
+        run: echo "${{ secrets.PAT_TOKEN }}" | gh auth login --with-token
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+
       - name: Criar PR da develop para main (se ainda não existir)
         run: |
           if gh pr list --base main --head develop --state open --json number --jq '.[].number' | grep -q .; then
@@ -97,4 +97,4 @@ jobs:
             echo "🚀 PR criado com sucesso!"
           fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
