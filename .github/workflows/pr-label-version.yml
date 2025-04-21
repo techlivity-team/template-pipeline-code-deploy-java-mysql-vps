@@ -1,12 +1,24 @@
+name: PR Label Versioning
+
+permissions:
+  contents: read
+  pull-requests: read
+
+on:
+  pull_request:
+    branches:
+      - develop
+    types: [opened, synchronize, reopened]
+
 jobs:
   label-version:
-    permissions:
-      contents: read
-      pull-requests: read
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-        with: { fetch-depth: 0 }
+      - name: Checkout repositório
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Instalar jq (para debug)
         run: sudo apt-get update && sudo apt-get install -y jq
@@ -14,28 +26,39 @@ jobs:
       - name: Obter commits do Pull Request e debugar JSON
         id: get_commits
         run: |
+          echo "🔍 Buscando JSON completo do PR #${{ github.event.pull_request.number }}..."
           gh pr view ${{ github.event.pull_request.number }} --json commits > pr.json
-          echo "📄 pr.json:"
+
+          echo "📄 Conteúdo de pr.json:"
           cat pr.json
-          echo "🔢 Número de commits:"
-          jq '.commits | length' pr.json
-          
-          commits=$(jq -r '.commits[].commit.message' pr.json)
-          echo "📝 Mensagens extraídas:"
-          echo "${commits}"
 
+          echo "🔢 Número de commits retornados:"
+          jq '.commits | length' pr.json || echo "(erro ao contar commits)"
+
+          echo "📝 Extraindo mensagens de commit:"
+          commits=$(jq -r '.commits[].commit.message' pr.json || echo "")
+          echo "$commits" || echo "(nenhuma mensagem extraída)"
+
+          # Exporta para o ambiente
           echo "COMMITS<<EOF" >> $GITHUB_ENV
-          echo "${commits}" >> $GITHUB_ENV
+          echo "$commits" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Fallback: extrair commits com git log
+      - name: 'Fallback: extrair commits com git log'
         if: env.COMMITS == ''
         run: |
-          echo "⚠️ Fallback git log"
+          echo "⚠️ Fallback para git log local"
           BASE_SHA=${{ github.event.pull_request.base.sha }}
           HEAD_SHA=${{ github.event.pull_request.head.sha }}
+          echo "   Base SHA: $BASE_SHA"
+          echo "   Head SHA: $HEAD_SHA"
+
           git log $BASE_SHA..$HEAD_SHA --pretty=format:"%s" > git_commits.txt
+          echo "📝 Commits via git log:"
           cat git_commits.txt
+
           echo "COMMITS<<EOF" >> $GITHUB_ENV
           cat git_commits.txt >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
@@ -43,22 +66,29 @@ jobs:
       - name: Determinar versão
         id: determine_version
         run: |
-          echo "🔍 COMMITS:"
+          echo "🔍 Commits analisados:"
           echo "${COMMITS}"
           version_label=""
+
           while read -r line; do
+            echo "🔎 Analisando: $line"
             if [[ "$line" =~ ^feat: ]]; then
-              version_label="version:major"; break
+              version_label="version:major"
+              echo "    → detectado 'feat:' → version:major"
+              break
             elif [[ "$line" =~ ^(fix|chore): ]]; then
               version_label="version:minor"
+              echo "    → detectado 'fix:' ou 'chore:' → version:minor"
             fi
           done <<< "${COMMITS}"
-          echo "🏷️ Label: $version_label"
+
+          echo "🏷️ Label final determinada: $version_label"
           echo "version_label=$version_label" >> $GITHUB_OUTPUT
 
       - name: Adicionar label ao PR
         if: steps.determine_version.outputs.version_label != ''
         run: |
+          echo "🏷️ Aplicando label '${{ steps.determine_version.outputs.version_label }}' ao PR #${{ github.event.pull_request.number }}..."
           gh pr edit ${{ github.event.pull_request.number }} --add-label "${{ steps.determine_version.outputs.version_label }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
