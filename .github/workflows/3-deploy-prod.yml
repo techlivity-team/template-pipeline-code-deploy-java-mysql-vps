@@ -199,6 +199,7 @@ jobs:
 
       - name: Get version from pom.xml
         id: version
+        working-directory: app
         run: |
           version=$(xmllint --xpath "/*[local-name()='project']/*[local-name()='version']/text()" pom.xml)
           echo "VERSION=$version" >> $GITHUB_ENV
