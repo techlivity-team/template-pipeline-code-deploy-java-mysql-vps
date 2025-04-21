@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>br.com.api</groupId>
 	<artifactId>api-teste-mysql</artifactId>
-	<version>6.0.0</version>
+	<version>6.1.0-SNAPSHOT</version>
 	<name>api-teste-mysql</name>
 	<description>Demo project for Spring Boot</description>
 	<url/>
@@ -41,6 +41,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>net.logstash.logback</groupId>
+			<artifactId>logstash-logback-encoder</artifactId>
+			<version>6.3</version>
 		</dependency>
 		<dependency>
 			<groupId>com.h2database</groupId>

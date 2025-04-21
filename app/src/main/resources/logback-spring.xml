@@ -1,19 +1,50 @@
-<configuration>
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="false">
+    <!-- Importa variáveis padrão do Spring Boot -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
-    <!-- Perfil de desenvolvimento: apenas console -->
-    <springProfile name="dev,local,test">
-        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-            <encoder>
-                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    <!-- ✅ Define a propriedade spring.profiles.active para uso no log -->
+    <springProperty name="environment" source="spring.profiles.active"/>
+
+    <!-- PERFIS DEV / LOCAL -->
+    <springProfile name="dev,local">
+        <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                <jsonGeneratorDecorator class="net.logstash.logback.decorate.PrettyPrintingJsonGeneratorDecorator"/>
+                <providers>
+                    <timestamp>
+                        <fieldName>timestamp</fieldName>
+                        <pattern>dd/MM/yyyy HH:mm:ss.SSS</pattern>
+                    </timestamp>
+                    <logLevel>
+                        <fieldName>level</fieldName>
+                    </logLevel>
+                    <loggerName>
+                        <fieldName>logger</fieldName>
+                    </loggerName>
+                    <!-- ✅ Campo customizado environment -->
+                    <pattern>
+                        <pattern>{"environment": "${environment}"}</pattern>
+                    </pattern>
+                    <threadName>
+                        <fieldName>thread</fieldName>
+                    </threadName>
+                    <message/>
+                    <mdc/>
+                    <arguments/>
+                    <logstashMarkers/>
+                    <keyValuePairs/>
+                    <stackTrace/>
+                </providers>
             </encoder>
         </appender>
 
         <root level="INFO">
-            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="JSON_CONSOLE"/>
         </root>
     </springProfile>
 
-    <!-- Perfil de produção: log em arquivo -->
+    <!-- PERFIL PROD -->
     <springProfile name="prod">
         <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
             <file>logs/app.log</file>
@@ -21,8 +52,33 @@
                 <fileNamePattern>logs/app-%d{yyyy-MM-dd}.log</fileNamePattern>
                 <maxHistory>10</maxHistory>
             </rollingPolicy>
-            <encoder>
-                <pattern>%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n</pattern>
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                <jsonGeneratorDecorator class="net.logstash.logback.decorate.PrettyPrintingJsonGeneratorDecorator"/>
+                <providers>
+                    <timestamp>
+                        <fieldName>timestamp</fieldName>
+                        <pattern>dd/MM/yyyy HH:mm:ss.SSS</pattern>
+                    </timestamp>
+                    <logLevel>
+                        <fieldName>level</fieldName>
+                    </logLevel>
+                    <loggerName>
+                        <fieldName>logger</fieldName>
+                    </loggerName>
+                    <!-- ✅ Campo customizado environment -->
+                    <pattern>
+                        <pattern>{"environment": "${environment}"}</pattern>
+                    </pattern>
+                    <threadName>
+                        <fieldName>thread</fieldName>
+                    </threadName>
+                    <message/>
+                    <mdc/>
+                    <arguments/>
+                    <logstashMarkers/>
+                    <keyValuePairs/>
+                    <stackTrace/>
+                </providers>
             </encoder>
         </appender>
 
@@ -30,5 +86,4 @@
             <appender-ref ref="FILE"/>
         </root>
     </springProfile>
-
 </configuration>
