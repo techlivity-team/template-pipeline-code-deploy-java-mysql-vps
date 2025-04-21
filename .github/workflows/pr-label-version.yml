@@ -13,6 +13,13 @@ jobs:
     steps:
       - name: Checkout repositório
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Login no GitHub CLI
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Obter commits do Pull Request
         id: get_commits
@@ -47,7 +54,6 @@ jobs:
             elif [[ "$line" =~ ^(fix|chore): ]]; then
               echo "✅ Detected 'fix:' ou 'chore:' — marcando como version:minor"
               version_label="version:minor"
-              # não usamos break, pois pode vir um feat depois
             fi
           done <<< "${COMMITS}"
           
