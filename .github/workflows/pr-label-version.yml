@@ -36,10 +36,9 @@ jobs:
           jq '.commits | length' pr.json || echo "(erro ao contar commits)"
 
           echo "📝 Extraindo mensagens de commit (messageHeadline):"
-          -         commits=$(jq -r '.commits[].commit.message' pr.json || echo "")
-          +         commits=$(jq -r '.commits[].messageHeadline' pr.json || echo "")
+          commits=$(jq -r '.commits[].messageHeadline' pr.json || echo "")
           echo "$commits" || echo "(nenhuma mensagem extraída)"
-          
+
           # Exporta para o ambiente
           echo "COMMITS<<EOF" >> $GITHUB_ENV
           echo "$commits" >> $GITHUB_ENV
@@ -55,11 +54,11 @@ jobs:
           HEAD_SHA=${{ github.event.pull_request.head.sha }}
           echo "   Base SHA: $BASE_SHA"
           echo "   Head SHA: $HEAD_SHA"
-          
+
           git log $BASE_SHA..$HEAD_SHA --pretty=format:"%s" > git_commits.txt
           echo "📝 Commits via git log:"
           cat git_commits.txt
-          
+
           echo "COMMITS<<EOF" >> $GITHUB_ENV
           cat git_commits.txt >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
@@ -70,7 +69,7 @@ jobs:
           echo "🔍 Commits analisados:"
           echo "${COMMITS}"
           version_label=""
-          
+
           while read -r line; do
             echo "🔎 Analisando: $line"
             if [[ "$line" =~ ^feat: ]]; then
@@ -82,7 +81,7 @@ jobs:
               echo "    → detectado 'fix:' ou 'chore:' → version:minor"
             fi
           done <<< "${COMMITS}"
-          
+
           echo "🏷️ Label final determinada: $version_label"
           echo "version_label=$version_label" >> $GITHUB_OUTPUT
 
