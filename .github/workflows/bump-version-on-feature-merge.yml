@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   bump-version:
-    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'feature/')
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
     steps:
@@ -28,14 +28,52 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Obter versão atual do Maven
-        working-directory: app
+      - name: Instalar GitHub CLI
+        run: sudo apt install gh
+
+      - name: Obter label do PR
+        id: pr-label
+        run: |
+          LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name')
+          echo "Labels do PR: $LABELS"
+
+          if echo "$LABELS" | grep -q "version:major"; then
+            echo "version_type=major" >> "$GITHUB_OUTPUT"
+          elif echo "$LABELS" | grep -q "version:minor"; then
+            echo "version_type=minor" >> "$GITHUB_OUTPUT"
+          elif echo "$LABELS" | grep -q "version:patch"; then
+            echo "version_type=patch" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::❌ Nenhuma label de versão encontrada! Adicione 'version:major', 'version:minor' ou 'version:patch' ao PR."
+            exit 1
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Obter versão atual e calcular nova
         id: get-version
+        working-directory: app
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+
           MAJOR=$(echo $VERSION | cut -d. -f1)
-          NEW_MAJOR=$((MAJOR + 1))
-          echo "new_version=$NEW_MAJOR.0.0" >> "$GITHUB_OUTPUT"
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          PATCH=$(echo $VERSION | cut -d. -f3 | cut -d- -f1)
+
+          case "${{ steps.pr-label.outputs.version_type }}" in
+            major)
+              NEW_MAJOR=$((MAJOR + 1))
+              echo "new_version=$NEW_MAJOR.0.0-SNAPSHOT" >> "$GITHUB_OUTPUT"
+              ;;
+            minor)
+              NEW_MINOR=$((MINOR + 1))
+              echo "new_version=$MAJOR.$NEW_MINOR.0-SNAPSHOT" >> "$GITHUB_OUTPUT"
+              ;;
+            patch)
+              NEW_PATCH=$((PATCH + 1))
+              echo "new_version=$MAJOR.$MINOR.$NEW_PATCH-SNAPSHOT" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
 
       - name: Atualizar versão no POM
         working-directory: app
