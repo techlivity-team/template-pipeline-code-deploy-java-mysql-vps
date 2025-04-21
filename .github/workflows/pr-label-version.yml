@@ -2,7 +2,8 @@ name: PR Label Versioning
 
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write
+  issues: write
 
 on:
   pull_request:
