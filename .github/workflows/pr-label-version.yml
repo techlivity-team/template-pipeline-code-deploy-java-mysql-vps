@@ -1,0 +1,47 @@
+name: PR Label Versioning
+
+on:
+  pull_request:
+    branches:
+      - develop
+    types: [opened, synchronize, reopened]
+
+jobs:
+  label-version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repositório
+        uses: actions/checkout@v3
+
+      - name: Obter commits do Pull Request
+        id: get_commits
+        run: |
+          commits=$(gh pr view ${{ github.event.pull_request.number }} --json commits -q ".commits[].message")
+          echo "COMMITS<<EOF" >> $GITHUB_ENV
+          echo "$commits" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determinar versão
+        id: determine_version
+        run: |
+          version_label=""
+          while read -r line; do
+            if [[ "$line" =~ ^feat: ]]; then
+              version_label="version:major"
+              break
+            elif [[ "$line" =~ ^(fix|chore): ]]; then
+              version_label="version:minor"
+            fi
+          done <<< "${COMMITS}"
+          
+          echo "version_label=$version_label" >> $GITHUB_OUTPUT
+
+      - name: Adicionar label ao PR
+        if: steps.determine_version.outputs.version_label != ''
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} --add-label "${{ steps.determine_version.outputs.version_label }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
