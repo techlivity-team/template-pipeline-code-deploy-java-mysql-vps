@@ -63,15 +63,15 @@ jobs:
           case "${{ steps.pr-label.outputs.version_type }}" in
             major)
               NEW_MAJOR=$((MAJOR + 1))
-              echo "new_version=$NEW_MAJOR.0.0-SNAPSHOT" >> "$GITHUB_OUTPUT"
+              echo "new_version=$NEW_MAJOR.0.0" >> "$GITHUB_OUTPUT"
               ;;
             minor)
               NEW_MINOR=$((MINOR + 1))
-              echo "new_version=$MAJOR.$NEW_MINOR.0-SNAPSHOT" >> "$GITHUB_OUTPUT"
+              echo "new_version=$MAJOR.$NEW_MINOR.0" >> "$GITHUB_OUTPUT"
               ;;
             patch)
               NEW_PATCH=$((PATCH + 1))
-              echo "new_version=$MAJOR.$MINOR.$NEW_PATCH-SNAPSHOT" >> "$GITHUB_OUTPUT"
+              echo "new_version=$MAJOR.$MINOR.$NEW_PATCH" >> "$GITHUB_OUTPUT"
               ;;
           esac
 
