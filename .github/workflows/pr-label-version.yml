@@ -16,8 +16,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Login no GitHub CLI
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+      - name: Testar autenticação com GitHub CLI
+        run: gh auth status
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
