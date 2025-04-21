@@ -1,62 +1,64 @@
-name: PR Label Versioning
-
-on:
-  pull_request:
-    branches:
-      - develop
-    types: [opened, synchronize, reopened]
-
 jobs:
   label-version:
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repositório
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v3
+        with: { fetch-depth: 0 }
 
-      - name: Obter commits do Pull Request
+      - name: Instalar jq (para debug)
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Obter commits do Pull Request e debugar JSON
         id: get_commits
         run: |
-          echo "🔍 Buscando commits do PR #${{ github.event.pull_request.number }}..."
-          commits=$(gh pr view ${{ github.event.pull_request.number }} \
-            --json commits \
-            -q ".commits[].commit.message")
+          gh pr view ${{ github.event.pull_request.number }} --json commits > pr.json
+          echo "📄 pr.json:"
+          cat pr.json
+          echo "🔢 Número de commits:"
+          jq '.commits | length' pr.json
           
-          echo "📝 Commits obtidos:"
-          echo "$commits" || echo "(nenhum commit encontrado)"
+          commits=$(jq -r '.commits[].commit.message' pr.json)
+          echo "📝 Mensagens extraídas:"
+          echo "${commits}"
 
           echo "COMMITS<<EOF" >> $GITHUB_ENV
-          echo "$commits" >> $GITHUB_ENV
+          echo "${commits}" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fallback: extrair commits com git log
+        if: env.COMMITS == ''
+        run: |
+          echo "⚠️ Fallback git log"
+          BASE_SHA=${{ github.event.pull_request.base.sha }}
+          HEAD_SHA=${{ github.event.pull_request.head.sha }}
+          git log $BASE_SHA..$HEAD_SHA --pretty=format:"%s" > git_commits.txt
+          cat git_commits.txt
+          echo "COMMITS<<EOF" >> $GITHUB_ENV
+          cat git_commits.txt >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Determinar versão
         id: determine_version
         run: |
-          echo "🔍 Determinando label de versão em ${COMMITS}:"
+          echo "🔍 COMMITS:"
           echo "${COMMITS}"
           version_label=""
           while read -r line; do
-            echo "🔎 Analisando: $line"
             if [[ "$line" =~ ^feat: ]]; then
-              version_label="version:major"
-              echo "    → será MAJOR"
-              break
+              version_label="version:major"; break
             elif [[ "$line" =~ ^(fix|chore): ]]; then
               version_label="version:minor"
-              echo "    → será MINOR"
             fi
           done <<< "${COMMITS}"
-          echo "🏷️ Label final: $version_label"
+          echo "🏷️ Label: $version_label"
           echo "version_label=$version_label" >> $GITHUB_OUTPUT
 
       - name: Adicionar label ao PR
         if: steps.determine_version.outputs.version_label != ''
         run: |
-          echo "🏷️ Aplicando label '${{ steps.determine_version.outputs.version_label }}' ao PR..."
           gh pr edit ${{ github.event.pull_request.number }} --add-label "${{ steps.determine_version.outputs.version_label }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
