@@ -17,7 +17,13 @@ jobs:
       - name: Obter commits do Pull Request
         id: get_commits
         run: |
+          echo "🔍 Buscando mensagens de commit do PR #${{ github.event.pull_request.number }}..."
+
           commits=$(gh pr view ${{ github.event.pull_request.number }} --json commits -q ".commits[].message")
+          
+          echo "📝 Commits obtidos:"
+          echo "$commits"
+
           echo "COMMITS<<EOF" >> $GITHUB_ENV
           echo "$commits" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
@@ -27,21 +33,31 @@ jobs:
       - name: Determinar versão
         id: determine_version
         run: |
+          echo "🔍 Determinando label de versão com base nas mensagens dos commits..."
+          echo "Commits analisados:"
+          echo "${COMMITS}"
+
           version_label=""
           while read -r line; do
+            echo "🔎 Analisando commit: $line"
             if [[ "$line" =~ ^feat: ]]; then
+              echo "✅ Detected 'feat:' — marcando como version:major"
               version_label="version:major"
               break
             elif [[ "$line" =~ ^(fix|chore): ]]; then
+              echo "✅ Detected 'fix:' ou 'chore:' — marcando como version:minor"
               version_label="version:minor"
+              # não usamos break, pois pode vir um feat depois
             fi
           done <<< "${COMMITS}"
           
+          echo "🏷️ Label determinada: $version_label"
           echo "version_label=$version_label" >> $GITHUB_OUTPUT
 
       - name: Adicionar label ao PR
         if: steps.determine_version.outputs.version_label != ''
         run: |
+          echo "🏷️ Adicionando label '${{ steps.determine_version.outputs.version_label }}' ao PR..."
           gh pr edit ${{ github.event.pull_request.number }} --add-label "${{ steps.determine_version.outputs.version_label }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
