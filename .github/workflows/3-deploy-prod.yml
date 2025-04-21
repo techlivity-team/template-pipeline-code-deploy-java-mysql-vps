@@ -185,53 +185,47 @@ jobs:
 
     steps:
       - name: Checkout código
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0  # necessário para obter histórico de tags
 
-      - name: Ler versão do Maven
-        working-directory: app
+      - name: Set up Git
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+      - name: Get version from pom.xml
         id: version
         run: |
-          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "Versão extraída do pom.xml: $VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          version=$(xmllint --xpath "/*[local-name()='project']/*[local-name()='version']/text()" pom.xml)
+          echo "VERSION=$version" >> $GITHUB_ENV
+          echo "::set-output name=version::$version"
 
-      - name: Criar tag (se ainda não existir)
+      - name: Get latest tag
+        id: lasttag
         run: |
-          git fetch --tags
-          VERSION="v${{ steps.version.outputs.version }}"
-          if git rev-parse "$VERSION" >/dev/null 2>&1; then
-            echo "Tag $VERSION já existe."
-          else
-            git config user.name "github-actions"
-            git config user.email "github-actions@github.com"
-            git tag "$VERSION"
-            git push origin "$VERSION"
-          fi
+          tag=$(git describe --tags --abbrev=0 || echo "")
+          echo "LAST_TAG=$tag" >> $GITHUB_ENV
+          echo "::set-output name=lasttag::$tag"
 
-      - name: Gerar changelog desde a última tag
+      - name: Get changelog
         id: changelog
         run: |
-          git fetch --tags
-          LAST_TAG=$(git describe --tags --abbrev=0 --match "v*" || echo "")
-          echo "Última tag: $LAST_TAG"
-
-          if [ -z "$LAST_TAG" ]; then
-            echo "⚠️ Nenhuma tag anterior encontrada. Listando todos os commits."
-            COMMITS=$(git log --pretty=format:"- %s (%an)")
+          if [ -z "${{ steps.lasttag.outputs.lasttag }}" ]; then
+            log=$(git log --pretty=format:"* %s (%an)" --no-merges)
           else
-            COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%an)")
+            log=$(git log ${{ steps.lasttag.outputs.lasttag }}..HEAD --pretty=format:"* %s (%an)" --no-merges)
           fi
+          echo "$log" > changelog.txt
+          echo "CHANGELOG<<EOF" >> $GITHUB_ENV
+          echo "$log" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
-          echo "$COMMITS" > changelog.txt
-          echo "$COMMITS"
-
-      - name: Criar release no GitHub
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: Versão ${{ steps.version.outputs.version }}
+          tag_name: v${{ env.VERSION }}
+          name: v${{ env.VERSION }}
           body_path: changelog.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
