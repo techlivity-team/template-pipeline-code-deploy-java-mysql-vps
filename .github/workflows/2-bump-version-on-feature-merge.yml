@@ -103,6 +103,13 @@ jobs:
           git commit -m "chore: bump version to ${{ steps.get-version.outputs.new_version }}"
           git push origin develop
 
+      - name: Logout e login do GitHub CLI com PAT
+        run: |
+          gh auth logout --hostname github.com --confirm || true
+          echo "${{ secrets.PAT_TOKEN }}" | gh auth login --with-token
+        env:
+          GH_TOKEN: ""
+
       - name: Login do GitHub CLI com PAT
         run: echo "${{ secrets.PAT_TOKEN }}" | gh auth login --with-token
         env:
