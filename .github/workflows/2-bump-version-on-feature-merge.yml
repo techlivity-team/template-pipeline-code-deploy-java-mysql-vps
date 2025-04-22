@@ -54,21 +54,43 @@ jobs:
         id: get-version
         working-directory: app
         run: |
+          # puxa versão do pom
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          MAJOR=$(echo $VERSION | cut -d. -f1)
-          MINOR=$(echo $VERSION | cut -d. -f2)
-          PATCH=$(echo $VERSION | cut -d. -f3 | cut -d- -f1)
+          echo "Versão atual extraída do pom.xml: $VERSION"
 
-          case "${{ steps.pr-label.outputs.version_type }}" in
+          # separa em major, minor, patch
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          MINOR=$(echo "$VERSION" | cut -d. -f2)
+          PATCH=$(echo "$VERSION" | cut -d. -f3 | cut -d- -f1)
+
+          echo "Componentes: MAJOR=$MAJOR, MINOR=$MINOR, PATCH=$PATCH"
+
+          VERSION_TYPE="${{ steps.pr-label.outputs.version_type }}"
+          echo "Tipo de bump solicitado: $VERSION_TYPE"
+
+          case "$VERSION_TYPE" in
             major)
               NEW_MAJOR=$((MAJOR + 1))
-              echo "new_version=$NEW_MAJOR.0.0" >> "$GITHUB_OUTPUT";;
+              NEW_VERSION="$NEW_MAJOR.0.0"
+              ;;
             minor)
               NEW_MINOR=$((MINOR + 1))
-              echo "new_version=$MAJOR.$NEW_MINOR.0" >> "$GITHUB_OUTPUT";;
+              NEW_VERSION="$MAJOR.$NEW_MINOR.0"
+              ;;
             patch)
               NEW_PATCH=$((PATCH + 1))
-              echo "new_version=$MAJOR.$MINOR.$NEW_PATCH" >> "$GITHUB_OUTPUT";;
+              NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+              ;;
+            *)
+              echo "::error::Tipo de bump inválido: $VERSION_TYPE"
+              exit 1
+              ;;
+          esac
+
+          echo "Nova versão calculada: $NEW_VERSION"
+
+          # exporta para próximas steps
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Atualizar versão no POM
         working-directory: app
