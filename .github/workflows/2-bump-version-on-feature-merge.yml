@@ -3,7 +3,8 @@ name: Bump Maven Version on Feature Merge
 on:
   pull_request:
     types: [closed]
-    branches: [develop]
+    branches:
+      - develop
 
 permissions:
   contents: write
@@ -28,11 +29,19 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Sincronizar branch develop
+        run: |
+          git fetch origin develop
+          git checkout develop
+          git pull --rebase origin develop
+
       - name: Instalar GitHub CLI
         run: sudo apt-get update && sudo apt-get install -y gh
 
       - name: Obter label do PR
         id: pr-label
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name')
           echo "Labels do PR: $LABELS"
@@ -47,22 +56,17 @@ jobs:
             echo "::error::❌ Nenhuma label de versão encontrada! Adicione 'version:major', 'version:minor' ou 'version:patch' ao PR."
             exit 1
           fi
-        env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
       - name: Obter versão atual e calcular nova
         id: get-version
         working-directory: app
         run: |
-          # puxa versão do pom
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "Versão atual extraída do pom.xml: $VERSION"
 
-          # separa em major, minor, patch
           MAJOR=$(echo "$VERSION" | cut -d. -f1)
           MINOR=$(echo "$VERSION" | cut -d. -f2)
           PATCH=$(echo "$VERSION" | cut -d. -f3 | cut -d- -f1)
-
           echo "Componentes: MAJOR=$MAJOR, MINOR=$MINOR, PATCH=$PATCH"
 
           VERSION_TYPE="${{ steps.pr-label.outputs.version_type }}"
@@ -88,15 +92,13 @@ jobs:
           esac
 
           echo "Nova versão calculada: $NEW_VERSION"
-
-          # exporta para próximas steps
           echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Atualizar versão no POM
         working-directory: app
         run: mvn versions:set -DnewVersion=${{ steps.get-version.outputs.new_version }} -DgenerateBackupPoms=false
 
-      - name: Commit da nova versão
+      - name: Commit da nova versão e push
         working-directory: app
         run: |
           git add pom.xml
