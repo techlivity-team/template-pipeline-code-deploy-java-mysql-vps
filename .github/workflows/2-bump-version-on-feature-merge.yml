@@ -103,27 +103,26 @@ jobs:
           git commit -m "chore: bump version to ${{ steps.get-version.outputs.new_version }}"
           git push origin develop
 
-      - name: Logout e login do GitHub CLI com PAT
-        run: |
-          gh auth logout --hostname github.com --confirm || true
-          echo "${{ secrets.PAT_TOKEN }}" | gh auth login --with-token
-        env:
-          GH_TOKEN: ""
-
-      - name: Login do GitHub CLI com PAT
-        run: echo "${{ secrets.PAT_TOKEN }}" | gh auth login --with-token
+      - name: Obter PRs abertos e criar PR de develop→main
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
-
-      - name: Criar PR da develop para main (se ainda não existir)
         run: |
+          echo "🔍 Verificando se já existe um PR develop→main..."
           if gh pr list --base main --head develop --state open --json number --jq '.[].number' | grep -q .; then
             echo "✅ PR da develop para main já existe. Nada a fazer."
           else
-            gh pr create --base main --head develop \
-              --title "Promoção de ambiente de desenvolvimento para Produção" \
+            echo "🚀 Criando PR de develop para main..."
+            gh pr create \
+              --base main \
+              --head develop \
+              --title "Promoção de ambiente de Desenvolvimento para Produção" \
               --body "PR automático criado pelo GitHub Actions para promover as alterações da branch develop para main."
-            echo "🚀 PR criado com sucesso!"
+            echo "✅ PR criado!"
           fi
+
+      - name: Confirmar label de version bump
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          echo "🏷️ Aplicando label version:${{ steps.pr-label.outputs.version_type }} ao PR #${{ github.event.pull_request.number }}..."
+          gh pr edit ${{ github.event.pull_request.number }} --add-label "version:${{ steps.pr-label.outputs.version_type }}"
