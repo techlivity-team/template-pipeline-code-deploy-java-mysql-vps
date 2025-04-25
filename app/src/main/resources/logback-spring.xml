@@ -2,10 +2,11 @@
 <configuration scan="false">
     <!-- Importa variáveis padrão do Spring Boot -->
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
-
-    <!-- ✅ Define a propriedade spring.profiles.active para uso no log -->
     <springProperty name="environment" source="spring.profiles.active"/>
-
+    <springProperty name="applicationName" source="spring.application.name"/>
+    <springProperty name="applicationVersion" source="application.version"/>
+    <springProperty name="serverPort" source="server.port"/>
+    <springProperty name="serverHost" source="machine.host"/>
     <!-- PERFIS DEV / LOCAL -->
     <springProfile name="dev,local">
         <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
@@ -14,7 +15,7 @@
                 <providers>
                     <timestamp>
                         <fieldName>timestamp</fieldName>
-                        <pattern>dd/MM/yyyy HH:mm:ss.SSS</pattern>
+                        <pattern>dd/MM/yyyy HH:mm:ss</pattern>
                     </timestamp>
                     <logLevel>
                         <fieldName>level</fieldName>
@@ -22,9 +23,8 @@
                     <loggerName>
                         <fieldName>logger</fieldName>
                     </loggerName>
-                    <!-- ✅ Campo customizado environment -->
                     <pattern>
-                        <pattern>{"environment": "${environment}"}</pattern>
+                        <pattern>{"application": {"name": "${applicationName}", "environment": "${environment}", "version" : "${applicationVersion}", "port": "${serverPort}", "host": "${serverHost}"}}</pattern>
                     </pattern>
                     <threadName>
                         <fieldName>thread</fieldName>
@@ -57,7 +57,7 @@
                 <providers>
                     <timestamp>
                         <fieldName>timestamp</fieldName>
-                        <pattern>dd/MM/yyyy HH:mm:ss.SSS</pattern>
+                        <pattern>dd/MM/yyyy HH:mm:ss</pattern>
                     </timestamp>
                     <logLevel>
                         <fieldName>level</fieldName>
@@ -65,9 +65,8 @@
                     <loggerName>
                         <fieldName>logger</fieldName>
                     </loggerName>
-                    <!-- ✅ Campo customizado environment -->
                     <pattern>
-                        <pattern>{"environment": "${environment}"}</pattern>
+                        <pattern>{"application": {"name": "${applicationName}", "environment": "${environment}", "version" : "${applicationVersion}", "port": "${serverPort}", "host": "${serverHost}", "address" :"${serverAddress}"}}</pattern>
                     </pattern>
                     <threadName>
                         <fieldName>thread</fieldName>
