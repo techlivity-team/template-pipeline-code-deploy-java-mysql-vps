@@ -35,7 +35,7 @@ public class UserController {
         MDC.put("correlationID", variable);
         LoggerFactory.getLogger("teste")
                 .atInfo()
-                .addKeyValue("variable", variable)
+                .addKeyValue("user", new User(1L, "Bruno"))
                 .setMessage("validando teste")
                 .log();
         return "ok feature";

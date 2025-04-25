@@ -38,6 +38,7 @@ jobs:
       - name: Salvar artefato JAR
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 1
           name: app-jar
           path: app/target/app.jar
 

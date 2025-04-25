@@ -30,6 +30,7 @@ jobs:
       - name: 📦 Salvar artefato gerado dinamicamente
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 1
           name: app-jar-dev
           path: app/target/*.jar  # detecta automaticamente qualquer JAR gerado
 
